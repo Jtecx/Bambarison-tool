@@ -4,7 +4,7 @@ import os
 
 def filecheck(files, fileexist):
     for filename in files:
-        if str(fileexist) in filename:
+        if fileexist == int(filename[:3]):
             print(f"File containing the integer {fileexist} found: {filename}")
             return filename
     print(f"No file containing the integer {fileexist} found in the folder.")
@@ -41,6 +41,18 @@ def imgmerge(images, filename):
     merged_image.save(f"{filename}.png", "PNG")
 
 
+def filefinder(files):
+    while True:
+        try:
+            fileexist = int(input("Who's next? Integers only! : "))
+            file1 = filecheck(files, fileexist)
+            if file1:
+                break
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
+    return file1
+
+
 def imgrequest():
     current_dir = os.path.join(os.path.dirname(__file__), "Characters_List")
     files = os.listdir(current_dir)
@@ -58,14 +70,19 @@ def imgrequest():
             print("Invalid input. Please enter an integer.")
 
     for _ in range(charcount):
+
+        file1 = filefinder(files)
+
         while True:
-            try:
-                fileexist = int(input("Who's next? Integers only! : "))
-                file1 = filecheck(files, fileexist)
-                if file1:
+            correctfile = input("Is this the right file? \"" + file1 + " \"  Y/N: ").lower()[:1]
+            if correctfile in ["y", "n"]:
+                if correctfile == "y":
                     break
-            except ValueError:
-                print("Invalid input. Please enter an integer.")
+                else:
+                    files.remove(file1)
+                    file1 = filefinder(files)
+            else:
+                print("Invalid input. Please enter Y or N.")
 
         while True:
             clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
