@@ -1,3 +1,5 @@
+import random
+
 from PIL import Image
 import os
 
@@ -23,14 +25,22 @@ def process_image(file_list):
     return result_images
 
 
-def merge_images(images, filename):
+def merge_images(images, filename, output_path):
     merged_width = 1200 * len(images)
     merged_image = Image.new("RGB", (merged_width, 1600))
     width = 0
     for image in images:
         merged_image.paste(image, (width, 0))
         width += 1200
-    merged_image.save(f"{filename}.png", "PNG")
+    try:
+        filename = output_path + "\\" + filename
+        merged_image.save(f"{filename}.png", "PNG")
+    except OSError:
+        print(
+            f"File name {filename}.png is too long. Replacing with a randomly generated string of numbers."
+        )
+        alteredname = output_path + "\\" + str(random.randint(1, 99999)) + ".png"
+        merged_image.save(alteredname, "PNG")
 
 
 def file_finder(files):
@@ -54,7 +64,10 @@ def request_images(current_dir, files):
     while True:
         try:
             char_count = int(
-                input("How many characters do you want to merge? Integers only! : ")
+                input(
+                    f"How many characters do you want to merge? Integers only! You currently have {len(files)} "
+                    f"characters in your list. Put the same number in to run auto-nude!: "
+                )
             )
             if char_count < 0:
                 raise ValueError("Negative integers are not allowed.")
@@ -62,30 +75,45 @@ def request_images(current_dir, files):
         except ValueError:
             print("Invalid input. Please enter an integer.")
 
-    for _ in range(char_count):
-        file1 = file_finder(files)
-
-        while True:
-            correct_file = input(f'Is this the right file? "{file1}"  Y/N: ').lower()[
-                           :1
-                           ]
-            if correct_file in ["y", "n"]:
-                if correct_file == "y":
-                    break
-                else:
-                    files.remove(file1)
+    if char_count == len(files):
+        checkall = input(
+            "Same number of total files detected! Did you want to do a full nude lineup? Y/N: "
+        ).lower()[:1]
+        if checkall in ["y", "n"]:
+            if checkall == "y":
+                for i in files:
+                    master_list.append([os.path.join(current_dir, i), False])
+                    file_mashup_name += (
+                        f"{'&' if file_mashup_name else ''}({'_'.join([i[:3], 'N'])})"
+                    )
+            else:
+                print("Understood. Manual selection time!")
+                for _ in range(char_count):
                     file1 = file_finder(files)
-            else:
-                print("Invalid input. Please enter Y or N.")
 
-        while True:
-            clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
-            if clothes in ["y", "n"]:
-                master_list.append([os.path.join(current_dir, file1), clothes == "y"])
-                file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([file1[:3], 'C' if clothes == 'y' else 'N'])})"
-                break
-            else:
-                print("Invalid input. Please enter Y or N.")
+                    # while True:
+                    #     correct_file = input(f'Is this the right file? "{file1}"  Y/N: ').lower()[
+                    #         :1
+                    #     ]
+                    #     if correct_file in ["y", "n"]:
+                    #         if correct_file == "y":
+                    #             break
+                    #         else:
+                    #             files.remove(file1)
+                    #             file1 = file_finder(files)
+                    #     else:
+                    #         print("Invalid input. Please enter Y or N.")
+
+                    while True:
+                        clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
+                        if clothes in ["y", "n"]:
+                            master_list.append(
+                                [os.path.join(current_dir, file1), clothes == "y"]
+                            )
+                            file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([file1[:3], 'C' if clothes == 'y' else 'N'])})"
+                            break
+                        else:
+                            print("Invalid input. Please enter Y or N.")
 
     return master_list, file_mashup_name
 
@@ -126,7 +154,7 @@ def pre_merge_and_move(char_val, files, current_dir):
             result_images.append(im.crop((1200, 0, 2400, 1600)))
 
     file_mod_name = [f for f in files if char_val in f][0][:-4]
-    merge_images(result_images, os.path.join(current_dir, file_mod_name + "merged"))
+    merge_images(result_images, file_mod_name + "merged", current_dir)
 
     hold_modified_file_list = [i for i in files if char_val not in i]
     hold_modified_file_list.append(file_mod_name + "merged.png")
@@ -141,7 +169,7 @@ def pre_merge_and_move(char_val, files, current_dir):
         try:
             os.rename(hold_move1[i], hold_move2[i])
         except OSError:
-            print("Directory may alraedy contain the same file. Skipping.")
+            print("Directory may already contain the same file. Skipping.")
     return hold_modified_file_list
 
 
@@ -155,7 +183,8 @@ def main():
     files = preprocess_files(files, current_dir)
     master_list, result_name = request_images(current_dir, files)
     img_complete = process_image(master_list)
-    merge_images(img_complete, output_dir + "\\" + result_name)
+    merge_images(img_complete, result_name, output_dir)
+    print("Process complete!")
 
 
 if __name__ == "__main__":
@@ -163,5 +192,6 @@ if __name__ == "__main__":
 
 #   TODO:
 #   Add automation to auto-run all in directory for specific type (nude/clothed) -split files, one proc, one input/pass?
+#   -Done, only handles nude.
 #   Add load from merged files based on file width - Clothed or nude option needs to be expanded to support this.
 #   Add auto-merge same-char files with different clothes -DONE
