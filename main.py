@@ -1,7 +1,28 @@
-import random
-
 from PIL import Image
 import os
+import time
+from queue import Queue
+import threading
+import random
+import logging
+
+
+def process_image_queue(file_list):
+    try:
+        q = Queue(maxsize=0)
+        numthreads = min(15, len(file_list))
+        results = [{} for _ in file_list]
+        for i in range(len(file_list)):
+            q.put((i, file_list[i]))
+
+        for i in range(numthreads):
+            process = threading.Thread(target=process_image, args=(q, results))
+            process.daemon = True
+            process.start()
+        q.join()
+        return results
+    except Exception as f:
+        logging.error(f"An error occurred: {f}")
 
 
 def find_matching_files(files, file_exist):
@@ -13,16 +34,18 @@ def find_matching_files(files, file_exist):
     return ""
 
 
-def process_image(file_list):
-    result_images = []
-    for file_path, not_naked in file_list:
-        im = Image.open(file_path)
+def process_image(q, results):
+    while not q.empty():
+        work = q.get()
+        print("New task started. " + str(work[0]) + "\n")
+        im = Image.open(work[1][0])
         crop_area = (0, 0, 1200, 1600)
-        if not_naked:
+        if work[1][1]:
             crop_area = (1200, 0, 2400, 1600)
-        im1 = im.crop(crop_area)
-        result_images.append(im1)
-    return result_images
+        results[work[0]] = im.crop(crop_area)
+        q.task_done()
+        print("New task done. " + str(work[0]) + "\n")
+    return True
 
 
 def merge_images(images, filename, output_path):
@@ -32,15 +55,13 @@ def merge_images(images, filename, output_path):
     for image in images:
         merged_image.paste(image, (width, 0))
         width += 1200
-    try:
-        filename = output_path + "\\" + filename
-        merged_image.save(f"{filename}.png", "PNG")
-    except OSError:
+    filename = output_path + "\\" + filename
+    if len(filename) > 254:
         print(
             f"File name {filename}.png is too long. Replacing with a randomly generated string of numbers."
         )
-        alteredname = output_path + "\\" + str(random.randint(1, 99999)) + ".png"
-        merged_image.save(alteredname, "PNG")
+        filename = output_path + "\\" + str(random.randint(1, 99999))
+    merged_image.save(f"{filename}.png", "PNG")
 
 
 def file_finder(files):
@@ -110,7 +131,10 @@ def request_images(current_dir, files):
                             master_list.append(
                                 [os.path.join(current_dir, file1), clothes == "y"]
                             )
-                            file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([file1[:3], 'C' if clothes == 'y' else 'N'])})"
+                            file_mashup_name += (
+                                f"{'&' if file_mashup_name else ''}"
+                                f"({'_'.join([file1[:3], 'C' if clothes == 'y' else 'N'])})"
+                            )
                             break
                         else:
                             print("Invalid input. Please enter Y or N.")
@@ -174,6 +198,7 @@ def pre_merge_and_move(char_val, files, current_dir):
 
 
 def main():
+    starttime = time.time()
     current_dir = os.path.join(os.path.dirname(__file__), "Characters_List")
     files = os.listdir(current_dir)
     files = [i for i in files if ".txt" not in i]
@@ -181,9 +206,14 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     files = preprocess_files(files, current_dir)
+    endtime = time.time()
     master_list, result_name = request_images(current_dir, files)
-    img_complete = process_image(master_list)
+    starttime2 = time.time()
+    img_complete = process_image_queue(master_list)
     merge_images(img_complete, result_name, output_dir)
+    endtime2 = time.time()
+    totaltime = round((endtime - starttime) + (endtime2 - starttime2), 3)
+    print(f"Total time used: {totaltime}")
     print("Process complete!")
 
 
