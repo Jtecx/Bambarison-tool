@@ -1,13 +1,13 @@
-# Image-comparison-builder
+# Bambarison tool!
 Builds images for comparison purposes by stacking them side by side. Console only, designed for Lewdiverse from MXDX
 
 Requirements:
-Pillow
+Pillow, numpy, queue, threading, logging.
 
 Tested on Python 3.11
 
 Usage:
-Create a folder to contain this python script. Inside this folder, place the script, as well as a folder called "Character_List" , without quotes. 
+Create a folder to contain this python script. Inside this folder, place the script, as well as a folder called "Originals" , without quotes. 
 Inside, drop the character sheet pngs.
 Leave the file name for the character sheets as what MXDX had given you, as it's used for the parsing of the character. In case you renamed it, the expected format is "000CharName.png"
 
