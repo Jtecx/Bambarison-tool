@@ -1,11 +1,22 @@
 from PIL import Image
+import numpy as np
 import os
+import sys
+import re
 from queue import Queue
 import threading
 import random
-import string
 import math
 import logging
+
+#   "Global" vars
+base_dir = os.path.dirname(__file__)
+original_images_dir = os.path.join(base_dir, "Originals")
+char_dir = os.path.join(base_dir, "Character_Lists")
+char_dir_nude = os.path.join(char_dir, "Nude")
+char_dir_clothed = os.path.join(char_dir, "Clothed")
+output_dir = os.path.join(base_dir, "Output")
+# bg_colours = []
 
 
 def process_image_queue(file_list):
@@ -26,25 +37,11 @@ def process_image_queue(file_list):
             process.daemon = True
             process.start()
         q.join()
-        print("All complete! Moving on.")
+        if len(file_list) > 0:
+            print("All complete! Moving on.")
         return results
     except Exception as f:
         logging.error(f"An error occurred: {f}")
-
-
-def find_matching_files(files, file_exist):
-    """
-    Checks if file exists.
-    :param files: List of image names. String.
-    :param file_exist: Character entry number, top left of character sheet. Integer.
-    :return: File name that matches. If none, returns empty string.
-    """
-    for filename in files:
-        if file_exist == int(filename[:3]):
-            print(f"File containing the integer {file_exist} found: {filename}")
-            return filename
-    print(f"No file containing the integer {file_exist} found in the folder.")
-    return ""
 
 
 def process_image(q, results):
@@ -55,95 +52,167 @@ def process_image(q, results):
     :return: Completed queue.
     """
     while not q.empty():
+        y01 = 0
+        y11 = 1200
         work = q.get()
         print("New task started. " + str(work[0]) + "\n")
-        im = Image.open(work[1][0])
-        crop_area = (0, 0, 1200, 1600)
+        clothed = []
+        nude = False
+        filename = work[1][0]
+        cycled_once = False  # First image should always be nude
+        im = Image.open(os.path.join(original_images_dir, filename))
+        for _ in range(int(im.width / 1200)):
+            im1 = im.crop((y01, 0, y11, 1600))
+            y01 = y11
+            y11 += 1200
+            if not background_only(im1):
+                if work[1][1]:
+                    if not nude:
+                        nude = im1
+                    else:
+                        clothed.append(im1)
+                else:
+                    if cycled_once:
+                        clothed.append(im1)
+            else:
+                break
+            cycled_once = True
+
         if work[1][1]:
-            crop_area = (1200, 0, 2400, 1600)
-        results[work[0]] = im.crop(crop_area)
+            nude = im.crop((0, 0, 1200, 1600))
+
+        if not nude:
+            results[work[0]] = [clothed, filename]
+        else:
+            results[work[0]] = [nude, clothed, filename]
         q.task_done()
         print("New task done. " + str(work[0]) + "\n")
     return True
 
 
-def merge_images(images, filename, output_path):
+def preprocess_files():
+    unmodified_images = sorted(
+        [i for i in os.listdir(original_images_dir) if ".png" in i]
+    )
+    known_nudes = sorted(os.listdir(char_dir_nude))
+    known_clothed = sorted(os.listdir(char_dir_clothed))
+    unmodified_images_int_only = []  # [char_entry_validation(i) for i in known_nudes]
+    entry_exists = []
+    process_list = []
+
+    for i in unmodified_images:
+        charval = char_entry_validation(i)
+        checking_filename = i[:-4]
+
+        # Fresh entry, no nudes/clothes
+        if (
+                (checking_filename not in known_nudes)
+                and (checking_filename not in known_clothed)
+                and (charval not in unmodified_images_int_only)
+        ):
+            unmodified_images_int_only.append(charval)
+            process_list.append([i, True])
+
+        # Char is run once already, has an entry, but may be having extra costumes.
+        elif checking_filename in known_nudes and (
+                charval not in unmodified_images_int_only
+        ):
+            unmodified_images_int_only.append(charval)
+
+        # Char has extra costumes. Folder uses first known image, so future new costumes should never match.
+        # elif (
+        #     (charval in unmodified_images_int_only)
+        # ):
+        else:
+            if i not in os.listdir(
+                    os.path.join(
+                        char_dir_clothed, listdir_intmatch(os.listdir(char_dir_clothed), i)
+                    )
+            ):
+                entry_exists.append([i, False])
+
+    set1 = process_image_queue(process_list)
+    set2 = process_image_queue(entry_exists)
+    return set1, set2
+
+
+def background_only(image):
+    # Convert the image to a NumPy array
+    image_array = np.asarray(image)
+
+    # Check if all elements of the array are the same
+    is_single_color = np.all(image_array == image_array[0])
+
+    return is_single_color
+
+
+def char_entry_validation(char_entry):
     """
-    Final Step. Combines individual image segments together.
-    :param images: Image list.
-    :param filename: Name of file. Expects '(000_C/N)&...', but if longer than254, replace with alnum string of X len.
-    :param output_path: Directory path of output file location.
-    :return: None
+    Takes a string, spits out first set of integers
+    :param char_entry: Type:String
+    :return: Int
     """
-    base_width = 1200  # Don't modify
-    base_height = 1600  # Don't modify
-    rowmax = 10  # Final image width
-    filename_length = 10  # Filename length if longer than OS limit
-    merged_width = base_width * len(images)
-    merged_height = base_height
-    if merged_width > base_width * rowmax:
-        merged_width = base_width * rowmax
-        merged_height = merged_height * math.ceil(len(images) / rowmax)
-    merged_image = Image.new("RGB", (merged_width, merged_height))
-    width = 0
-    height = 0
-    for image in images:
-        merged_image.paste(image, (width, height))
-        width += base_width
-        if width >= base_width * rowmax:
-            width = 0
-            height += base_height
-    filename = output_path + "\\" + filename
-    if len(filename) > 254:
+    return int(re.search(r"\d+", char_entry).group())
+
+
+def listdir_intmatch(source, target):
+    result = [j for j in source if str(char_entry_validation(target)) in j][0]
+    return result
+
+
+def sorting_files(imageset1, imageset2):
+    for i in imageset1:
+        nude_charsprite = i[0]
+        nude_chardir = os.path.join(char_dir_nude, i[-1])[:-4]
+        if not os.path.exists(nude_chardir):
+            os.mkdir(nude_chardir)
+        nude_charsprite.save(os.path.join(nude_chardir, i[-1]), "PNG")
+
+        clothed_charsprite = i[1]
+        clothed_chardir = os.path.join(char_dir_clothed, i[-1])[:-4]
+        if not os.path.exists(clothed_chardir):
+            os.mkdir(clothed_chardir)
+        clothed_charsprite[0].save(os.path.join(clothed_chardir, i[-1]), "PNG")
+
+    for i in imageset2:
+        clothed_charsprite = i[0]
+        charval = char_entry_validation(i[-1])
+        chardir = os.listdir(char_dir_clothed)
+        charsavedir = [
+            char_dir_clothed + "\\" + j
+            for j in chardir
+            if charval == char_entry_validation(j)
+        ]
+        clothed_charsprite[0].save(os.path.join(charsavedir[0], i[-1]), "PNG")
+
+    # print("done")
+
+
+def folder_setup():
+    if not os.path.exists(original_images_dir):
         print(
-            f"File name {filename}.png is too long. Replacing with a randomly generated string of numbers."
+            "Missing original images source. Please make a folder called 'Originals' in the same place as this file, "
+            "and drop your image sheets within, then run the script again."
         )
-        filename = (
-            output_path
-            + "\\"
-            + "".join(
-                random.choices(string.ascii_letters + string.digits, k=filename_length)
-            )
-        )
-    merged_image.save(f"{filename}.png", "PNG")
-    print(f"File name {filename}.png saved!.")
+        sys.exit()
+    if not os.path.exists(char_dir):
+        os.makedirs(char_dir)
+    if not os.path.exists(char_dir_nude):
+        os.makedirs(char_dir_nude)
+    if not os.path.exists(char_dir_clothed):
+        os.makedirs(char_dir_clothed)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
 
-def file_finder(files):
-    """
-    File input handler. Loop for manual input.
-    :param files: List of image names.
-    :return: File name.
-    """
-    while True:
-        try:
-            file_exist = int(input("Who's next? Integers only! : "))
-            if file_exist < 0:
-                raise ValueError("Negative integers are not allowed.")
-            file1 = find_matching_files(files, file_exist)
-            if file1:
-                break
-        except ValueError:
-            print("Invalid input. Please enter an integer.")
-    return file1
-
-
-def request_images(current_dir, files):
-    """
-    File image handler. Main interface.
-    :param current_dir: Directory path for Character sheets.
-    :param files: List of image names.
-    :return: master_list: list of all images to process, file_mashup_name: expected file output name.
-    """
-    master_list = []
-    file_mashup_name = ""
-
+def request_images():
     while True:
         try:
             char_count = int(
                 input(
-                    f"How many characters do you want to merge? Integers only! You currently have {len(files)} "
-                    f"characters in your list. Put the same number in to run auto-nude!: "
+                    f"How many characters do you want to merge? Integers only! You currently have "
+                    f"{len(os.listdir(char_dir_nude))} characters in your list. Put the same number in to run auto-nude"
+                    f"!: "
                 )
             )
             if char_count < 0:
@@ -152,138 +221,170 @@ def request_images(current_dir, files):
         except ValueError:
             print("Invalid input. Please enter an integer.")
 
-    if char_count == len(files):
-        checkall = input(
-            "Same number of total files detected! Did you want to do a full nude lineup? Y/N: "
-        ).lower()[:1]
-        if checkall in ["y", "n"]:
-            if checkall == "y":
-                for i in files:
-                    master_list.append([os.path.join(current_dir, i), False])
-                    file_mashup_name += (
-                        f"{'&' if file_mashup_name else ''}({'_'.join([i[:3], 'N'])})"
-                    )
-    else:
-        print("Understood. Manual selection time!")
-        for _ in range(char_count):
-            file1 = file_finder(files)
-
-            # while True:
-            #     correct_file = input(f'Is this the right file? "{file1}"  Y/N: ').lower()[
-            #         :1
-            #     ]
-            #     if correct_file in ["y", "n"]:
-            #         if correct_file == "y":
-            #             break
-            #         else:
-            #             files.remove(file1)
-            #             file1 = file_finder(files)
-            #     else:
-            #         print("Invalid input. Please enter Y or N.")
-
-            while True:
-                clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
-                if clothes in ["y", "n"]:
-                    master_list.append(
-                        [os.path.join(current_dir, file1), clothes == "y"]
-                    )
-                    file_mashup_name += (
-                        f"{'&' if file_mashup_name else ''}"
-                        f"({'_'.join([file1[:3], 'C' if clothes == 'y' else 'N'])})"
-                    )
-                    break
+    master_list = []
+    file_mashup_name = ""
+    if char_count == len(os.listdir(char_dir_nude)):
+        while True:
+            checkall = input(
+                "Same number of total files detected! Did you want to do a full nude/clothed lineup? N/C: "
+            ).lower()[:1]
+            if checkall in ["n", "c"]:
+                if checkall == "n":
+                    for i in os.listdir(char_dir_nude):
+                        char_fullpath = os.path.join(char_dir_nude, i)
+                        master_list.append(
+                            Image.open(
+                                os.path.join(
+                                    char_fullpath, os.listdir(char_fullpath)[0]
+                                )
+                            )
+                        )
+                        file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([i[:3], 'N'])})"
+                elif checkall == "c":
+                    print("not done")
+                    sys.exit()
                 else:
-                    print("Invalid input. Please enter Y or N.")
+                    master_list, file_mashup_name = request_images_manual(char_count)
+                break
+            else:
+                raise ValueError("Invalid input. Try again.")
+    else:
+        master_list, file_mashup_name = request_images_manual(char_count)
 
     return master_list, file_mashup_name
 
 
-def preprocess_files(files, current_dir):
+def request_images_manual(char_count):
+    file_mashup_name = ""
+    master_list = []
+    print("Manual selection time!")
+    for _ in range(char_count):
+        charval = 0
+        v1 = True
+        while v1:
+            try:
+                charval = int(input("Who's next? Integers only! : "))
+                if charval < 0:
+                    raise ValueError("Negative integers are not allowed.")
+                for i in os.listdir(char_dir_nude):
+                    if charval == char_entry_validation(i):
+                        print(f"Character sheet no. {charval} found!")
+                        v1 = False
+                        break
+            except ValueError:
+                print("Invalid input. Please enter an integer.")
+
+        while True:
+            clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
+            if clothes in ["y", "n"]:
+                if clothes == "y":
+                    char_content = os.path.join(
+                        char_dir_clothed,
+                        str(
+                            listdir_intmatch(os.listdir(char_dir_clothed), str(charval))
+                        ),
+                    )
+                    if len(os.listdir(char_content)) > 1:
+                        filefound = False
+                        for file1 in os.listdir(char_content):
+                            correct_file = input(
+                                f'Is this the right file? "{file1}"  Y/N: '
+                            ).lower()[:1]
+                            verify = True
+                            while verify:
+                                if correct_file in ["y", "n"]:
+                                    if correct_file == "y":
+                                        master_list.append(
+                                            Image.open(
+                                                os.path.join(char_content, file1)
+                                            )
+                                        )
+                                        filefound = True
+                                    else:
+                                        print("Understood. Trying again.")
+                                    verify = False
+                                else:
+                                    print("Invalid input. Please enter Y or N.")
+                        if not filefound:
+                            print(
+                                f"Last one of {charval} found. Since none was chosen, Aborting."
+                            )
+                            sys.exit()
+                    else:
+                        master_list.append(
+                            Image.open(
+                                os.path.join(char_content, os.listdir(char_content)[0])
+                            )
+                        )
+                else:
+                    char_content = os.path.join(
+                        char_dir_nude,
+                        str(
+                            [i for i in os.listdir(char_dir_nude) if str(charval) in i][
+                                0
+                            ]
+                        ),
+                    )
+                    master_list.append(
+                        Image.open(
+                            os.path.join(char_content, os.listdir(char_content)[0])
+                        )
+                    )
+                file_mashup_name += (
+                    f"{'&' if file_mashup_name else ''}"
+                    f"({'_'.join([str(charval), 'C' if clothes == 'y' else 'N'])})"
+                )
+                break
+            else:
+                print("Invalid input. Please enter Y or N.")
+    return master_list, file_mashup_name
+
+
+def merge_images(images, filename):
     """
-    Checks for duplicate char sheet ints. Example: 009.
-    :param files: List of image names.
-    :param current_dir: Directory of Character sheets.
-    :return: cleaned list of image names.
+    Final Step. Combines individual image segments together.
+    :param images: Image list.
+    :param filename: Name of file. Expects '(000_C/N)&...', but if longer than254, replace with alnum string of X len.
+    :return: None
     """
-    temp_hold = []
-    for i in files:
-        if i[:3] not in temp_hold:  # Could break, if Moxy gets to 999+ chars.
-            temp_hold.append(i[:3])
-            temp_hold.sort()
-        else:
-            files = pre_merge_and_move(i[:3], files, current_dir)
-    return files
-
-
-def pre_merge_and_move(char_val, files, current_dir):
-    """
-    Merges charsheets if multiple costumes are found, and moves the original file to other folder for backup.
-    :param char_val: Character value, top left.
-    :param files: file list to clean
-    :param current_dir: Directory of Character sheets.
-    :return: cleaned list of image names.
-    """
-    merge_total = [os.path.join(current_dir, i) for i in files if char_val in i]
-    merge_total = sorted(merge_total, key=lambda x: "merged" in x, reverse=True)
-    result_images = []
-
-    for i in merge_total:
-        im = Image.open(i)
-        y0 = 0
-        y1 = 1200
-        if not result_images:
-            y01 = y0
-            y11 = y1
-            if "merged" in i:  # merged images that need new clothes added on
-                for _ in range(int(im.width / 1200)):
-                    result_images.append(im.crop((y01, 0, y11, 1600)))
-                    y01 = y11
-                    y11 += 1200
-            else:  # new set of images to merge together
-                result_images.append(im.crop((0, 0, 1200, 1600)))
-                result_images.append(im.crop((1200, 0, 2400, 1600)))
-        else:  # looping through, cutting out the second image.
-            # THIS WILL BREAK IF STANDALONE CLOTHES SPRITES ARE RELEASED.
-            result_images.append(im.crop((1200, 0, 2400, 1600)))
-
-    file_mod_name = [f for f in files if char_val in f][0][:-4]
-    merge_images(result_images, file_mod_name + "merged", current_dir)
-
-    hold_modified_file_list = [i for i in files if char_val not in i]
-    hold_modified_file_list.append(file_mod_name + "merged.png")
-    hold_move1 = [os.path.join(current_dir, i) for i in files if char_val in i]
-    hold_move2 = [
-        s.replace("Characters_List", "Characters_List_Unmerged") for s in hold_move1
-    ]
-    temp1 = os.path.split(hold_move2[1])[0]
-    if not os.path.exists(temp1):
-        os.makedirs(temp1)
-    for i in range(len(hold_move1)):
-        try:
-            os.rename(hold_move1[i], hold_move2[i])
-        except OSError:
-            print("Directory may already contain the same file. Skipping.")
-    return hold_modified_file_list
+    base_width = 1200  # Don't modify
+    base_height = 1600  # Don't modify
+    rowmax = 10  # Final image width
+    merged_width = base_width * len(images)
+    merged_height = base_height
+    if merged_width > base_width * rowmax:
+        merged_width = base_width * rowmax
+        merged_height = merged_height * math.ceil(len(images) / rowmax)
+    merged_image = Image.new("RGB", (merged_width, merged_height))
+    width = 0
+    height = 0
+    for im in images:
+        merged_image.paste(im, (width, height))
+        width += base_width
+        if width >= base_width * rowmax:
+            width = 0
+            height += base_height
+    filename = os.path.join(output_dir, filename)
+    if len(filename) > 254:
+        print(
+            f"File name {filename}.png is too long. Replacing with a randomly generated string of numbers."
+        )
+        filename = os.path.join(output_dir, str(random.randint(1, 999999)))
+    merged_image.save(f"{filename}.png", "PNG")
+    print(f"File name {filename}.png saved!.")
 
 
 def main():
-    # time1 = time.time()
-    current_dir = os.path.join(os.path.dirname(__file__), "Characters_List")
-    files = os.listdir(current_dir)
-    files = [i for i in files if ".txt" not in i]
-    output_dir = os.path.join(os.path.dirname(__file__), "Output")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    files = preprocess_files(files, current_dir)
-    # time1 = time.time() - time1
-    master_list, result_name = request_images(current_dir, files)
-    # time2 = time.time()
-    img_complete = process_image_queue(master_list)
-    merge_images(img_complete, result_name, output_dir)
-    # time2 = time.time() - time2
-    # totaltime = round(time1 + time2, 3)
-    # print(f"Total time used: {totaltime}")
-    print("Process complete!")
+    # Initial folder prerequisite checks
+    folder_setup()
+
+    # Start checking if images are properly broken apart
+    imageset1, imageset2 = preprocess_files()
+    sorting_files(imageset1, imageset2)
+
+    # Request user settings
+    master_list, final_name = request_images()
+    merge_images(master_list, final_name)
 
 
 if __name__ == "__main__":
@@ -291,7 +392,4 @@ if __name__ == "__main__":
 
 #   TODO:
 #   Add automation to auto-run all in directory for specific type (nude/clothed) -split files, one proc, one input/pass?
-#   -Done, only handles nude.
-#   Add load from merged files based on file width - Clothed or nude option needs to be expanded to support this.
-#   Add auto-merge same-char files with different clothes -DONE
-#   Image matrices for image building using numpy?
+#   - Partially Done, only handles nude.
