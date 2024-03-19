@@ -106,16 +106,16 @@ def preprocess_files():
 
         # Fresh entry, no nudes/clothes
         if (
-                (checking_filename not in known_nudes)
-                and (checking_filename not in known_clothed)
-                and (charval not in unmodified_images_int_only)
+            (checking_filename not in known_nudes)
+            and (checking_filename not in known_clothed)
+            and (charval not in unmodified_images_int_only)
         ):
             unmodified_images_int_only.append(charval)
             process_list.append([i, True])
 
         # Char is run once already, has an entry, but may be having extra costumes.
         elif checking_filename in known_nudes and (
-                charval not in unmodified_images_int_only
+            charval not in unmodified_images_int_only
         ):
             unmodified_images_int_only.append(charval)
 
@@ -125,9 +125,9 @@ def preprocess_files():
         # ):
         else:
             if i not in os.listdir(
-                    os.path.join(
-                        char_dir_clothed, listdir_intmatch(os.listdir(char_dir_clothed), i)
-                    )
+                os.path.join(
+                    char_dir_clothed, listdir_intmatch(os.listdir(char_dir_clothed), i)
+                )
             ):
                 entry_exists.append([i, False])
 
@@ -225,29 +225,33 @@ def request_images():
     file_mashup_name = ""
     if char_count == len(os.listdir(char_dir_nude)):
         while True:
-            checkall = input(
-                "Same number of total files detected! Did you want to do a full nude/clothed lineup? N/C: "
-            ).lower()[:1]
-            if checkall in ["n", "c"]:
-                if checkall == "n":
-                    for i in os.listdir(char_dir_nude):
-                        char_fullpath = os.path.join(char_dir_nude, i)
-                        master_list.append(
-                            Image.open(
-                                os.path.join(
-                                    char_fullpath, os.listdir(char_fullpath)[0]
+            try:
+                checkall = input(
+                    "Same number of total files detected! Did you want to do a full nude/clothed lineup? N/C: "
+                ).lower()[:1]
+                if checkall in ["n", "c"]:
+                    if checkall == "n":
+                        for i in os.listdir(char_dir_nude):
+                            char_fullpath = os.path.join(char_dir_nude, i)
+                            master_list.append(
+                                Image.open(
+                                    os.path.join(
+                                        char_fullpath, os.listdir(char_fullpath)[0]
+                                    )
                                 )
                             )
+                            file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([i[:3], 'N'])})"
+                    elif checkall == "c":
+                        merge_images_clothed()
+                    else:
+                        master_list, file_mashup_name = request_images_manual(
+                            char_count
                         )
-                        file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([i[:3], 'N'])})"
-                elif checkall == "c":
-                    print("not done")
-                    sys.exit()
+                    break
                 else:
-                    master_list, file_mashup_name = request_images_manual(char_count)
-                break
-            else:
-                raise ValueError("Invalid input. Try again.")
+                    raise ValueError("Invalid input. Try again.")
+            except ValueError:
+                print("Invalid input.")
     else:
         master_list, file_mashup_name = request_images_manual(char_count)
 
@@ -369,9 +373,32 @@ def merge_images(images, filename):
         print(
             f"File name {filename}.png is too long. Replacing with a randomly generated string of numbers."
         )
-        filename = os.path.join(output_dir, str(random.randint(1, 999999)))
+        filename = os.path.join(output_dir, str(random.randint(1, 999999))) + "_allnude"
     merged_image.save(f"{filename}.png", "PNG")
     print(f"File name {filename}.png saved!.")
+
+
+def merge_images_clothed():
+    base_height = len(os.listdir(char_dir_clothed)) * 1600
+    base_width = 0
+    for i in os.listdir(char_dir_clothed):
+        tempval = len(os.listdir(os.path.join(char_dir_clothed, i)))
+        base_width = max(base_width, tempval)
+    base_width = base_width * 1200
+    merged_image = Image.new("RGB", (base_width, base_height))
+    x = 0  # width
+    y = 0  # height
+    for i in os.listdir(char_dir_clothed):
+        for j in os.listdir(os.path.join(char_dir_clothed, i)):
+            merging_hold = Image.open(os.path.join(char_dir_clothed, i, j))
+            merged_image.paste(merging_hold, (y, x))
+            y += 1200
+        x += 1600
+        y = 0
+    filename = os.path.join(output_dir, str(random.randint(1, 999999))) + "_allclothed"
+    merged_image.save(f"{filename}.png", "PNG")
+    print("Done.")
+    sys.exit()
 
 
 def main():
@@ -389,7 +416,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#   TODO:
-#   Add automation to auto-run all in directory for specific type (nude/clothed) -split files, one proc, one input/pass?
-#   - Partially Done, only handles nude.
