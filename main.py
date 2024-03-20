@@ -223,7 +223,7 @@ def process_image(q, results):
             char_val = char_entry_validation(filename)
             char_dir_2 = os.listdir(char_dir_clothed)
             char_save_dir = [
-                char_dir_clothed + "\\" + j
+                os.path.join(char_dir_clothed, j)
                 for j in char_dir_2
                 if char_val == char_entry_validation(j)
             ]
@@ -314,7 +314,7 @@ def request_images():
                             )
                             file_mashup_name += (
                                 f"{'&' if file_mashup_name else ''}"
-                                f"({'_'.join([char_entry_validation(i), 'N'])})"
+                                f"({'_'.join([str(char_entry_validation(i)), 'N'])})"
                             )
                     elif checkall == "c":
                         merge_images_clothed()
@@ -362,7 +362,6 @@ def request_images_manual(char_count):
                 print("Invalid input. Please enter an integer.")
 
         while True:
-            file_found = False
             clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
             if clothes in ["y", "n"]:
                 if clothes == "y":
@@ -375,6 +374,7 @@ def request_images_manual(char_count):
                         ),
                     )
                     if len(os.listdir(char_content)) > 1:
+                        file_found = False
                         for file1 in os.listdir(char_content):
                             correct_file = input(
                                 f'Is this the right file? "{file1}"  Y/N: '
@@ -388,7 +388,12 @@ def request_images_manual(char_count):
                                                 os.path.join(char_content, file1)
                                             )
                                         )
+                                        file_mashup_name += (
+                                            f"{'&' if file_mashup_name else ''}"
+                                            f"({'_'.join([str(char_val), 'C'])})"
+                                        )
                                         file_found = True
+                                        break
                                     else:
                                         print("Understood. Trying again.")
                                     verify = False
@@ -407,8 +412,11 @@ def request_images_manual(char_count):
                                 os.path.join(char_content, os.listdir(char_content)[0])
                             )
                         )
+                        file_mashup_name += (
+                            f"{'&' if file_mashup_name else ''}"
+                            f"({'_'.join([str(char_val), 'C'])})"
+                        )
                 else:
-                    file_found = True
                     char_content = os.path.join(
                         char_dir_nude,
                         str(
@@ -424,10 +432,9 @@ def request_images_manual(char_count):
                             os.path.join(char_content, os.listdir(char_content)[0])
                         )
                     )
-                if file_found:
                     file_mashup_name += (
                         f"{'&' if file_mashup_name else ''}"
-                        f"({'_'.join([str(char_val), 'C' if clothes == 'y' else 'N'])})"
+                        f"({'_'.join([str(char_val),'N'])})"
                     )
                 break
             else:
