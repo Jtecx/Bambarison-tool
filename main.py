@@ -15,8 +15,10 @@ original_images_dir = os.path.join(base_dir, "Originals")
 char_dir = os.path.join(base_dir, "Character_Lists")
 char_dir_nude = os.path.join(char_dir, "Nude")
 char_dir_clothed = os.path.join(char_dir, "Clothed")
+char_dir_entry = os.path.join(char_dir, "Entry_Values")
 output_dir = os.path.join(base_dir, "Output")
-# bg_colours = []
+bg_colours = [[239, 239, 239, 255], [230, 230, 230, 255], [229, 229, 229, 255]]
+# White-ish grey, darker grey, and slightly more different darker grey.
 
 
 # Helper functions
@@ -34,7 +36,7 @@ def listdir_int_match(source, target):
     Function to return first matching int file/folder name from list.
     :param source: List of directory contents.
     :param target: String to match against.
-    :return:
+    :return: String of int value.
     """
     try:
         result = [j for j in source if str(char_entry_validation(target)) in j][0]
@@ -44,6 +46,15 @@ def listdir_int_match(source, target):
     return result
 
 
+def img_to_numpy(image):
+    """
+    Converts Image to numpy, and skips over the annoying IDE warnings about unexpected type.
+    :param image: Image type
+    :return: Numpy array
+    """
+    return np.asarray(image)
+
+
 def background_only(image):
     """
     Checks for if the image is entirely background, no char sprites.
@@ -51,7 +62,7 @@ def background_only(image):
     :return: Boolean
     """
     # Convert the image to a NumPy array
-    image_array = np.asarray(image)
+    image_array = img_to_numpy(image)
 
     # Check if all elements of the array are the same
     is_single_color = np.all(image_array == image_array[0])
@@ -82,6 +93,8 @@ def folder_setup():
         os.makedirs(char_dir_clothed)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    if not os.path.exists(char_dir_entry):
+        os.makedirs(char_dir_entry)
 
 
 # Step 2
@@ -105,16 +118,16 @@ def preprocess_files():
 
         # Fresh entry, no nudes/clothes
         if (
-                (checking_filename not in known_nudes)
-                and (checking_filename not in known_clothed)
-                and (char_val not in unmodified_images_int_only)
+            (checking_filename not in known_nudes)
+            and (checking_filename not in known_clothed)
+            and (char_val not in unmodified_images_int_only)
         ):
             unmodified_images_int_only.append(char_val)
             process_list.append([i, True])
 
         # Char is run once already, has an entry, but may be having extra costumes.
         elif checking_filename in known_nudes and (
-                char_val not in unmodified_images_int_only
+            char_val not in unmodified_images_int_only
         ):
             unmodified_images_int_only.append(char_val)
 
@@ -131,7 +144,7 @@ def preprocess_files():
                 char_dir_clothed, listdir_int_match(clothed_pre_creation_check, i)
             )
             if not os.path.exists(path_simplified) and not os.path.exists(
-                    path_simplified + i
+                path_simplified + i
             ):
                 # print(path_simplified)
                 # print(path_simplified + "\\" + i)
@@ -216,6 +229,30 @@ def process_image(q, results):
         q.task_done()
         print("New task done. " + str(work[0]) + "\n")
     return True
+
+
+def char_entry_img_extract():
+    """
+    Extracts the char entry number as pixels in the top left, and saves them for separate use.
+    :return: None
+    """
+    img_set = os.listdir(char_dir_nude)
+    char_sheet_init_dim = (0, 0, 125, 100)
+    target_color = np.array(bg_colours[0])
+    for i in img_set:
+        filename = os.path.join(char_dir_entry, str(char_entry_validation(i)) + ".png")
+        # print(filename)
+        if not os.path.exists(filename):
+            im = Image.open(os.path.join(char_dir_nude, i, i + ".png"))
+            im1 = im.crop(char_sheet_init_dim)
+            im1 = im1.convert("RGBA")
+            image_array = img_to_numpy(im1)
+            image_array = image_array.copy()
+            mask = np.all(image_array == target_color, axis=-1)
+            image_array[mask, 3] = 0
+            modified_image = Image.fromarray(image_array)
+            modified_image.save(f"{filename}", "PNG")
+            # print(f"{i} character sheet number has been extracted and saved.")
 
 
 # Step 3
@@ -469,6 +506,7 @@ def merge_images_clothed():
             y += 1200
         x += 1600
         y = 0
+
     filename = os.path.join(output_dir, str(random.randint(1, 999999))) + "_clothed"
     merged_image.save(f"{filename}.png", "PNG")
     print("Done.")
@@ -482,6 +520,7 @@ def main():
 
     # Start checking if images are properly broken apart
     image_set1, image_set2 = preprocess_files()
+    char_entry_img_extract()
     sorting_files(image_set1, image_set2)
 
     # Request user settings
@@ -491,3 +530,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# TODO:
+#
+# Pixel background strip colour?
