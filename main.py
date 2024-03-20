@@ -70,6 +70,32 @@ def background_only(image):
     return is_single_color
 
 
+def process_list_queue(file_list, func_proc):
+    """
+    Handles images and prepares them for spreading out of jobs
+    :param file_list: List of images. Includes the fill path to image.
+    :param func_proc: Function to multi-thread.
+    :return: List of cut images. Sequence is preserved. FIFO.
+    """
+    try:
+        q = Queue(maxsize=0)
+        numthreads = min(15, len(file_list))
+        results = [{} for _ in file_list]
+        for i in range(len(file_list)):
+            q.put((i, file_list[i]))
+
+        for i in range(numthreads):
+            process = threading.Thread(target=func_proc, args=(q, results))
+            process.daemon = True
+            process.start()
+        q.join()
+        if len(file_list) > 0:
+            print("All complete! Moving on.")
+        return results
+    except Exception as f:
+        logging.error(f"An error occurred: {f}")
+
+
 # Step 1
 def folder_setup():
     """
@@ -81,6 +107,7 @@ def folder_setup():
             "Missing original images source. Please make a folder called 'Originals' in the same place as this file, "
             "and drop your image sheets within, then run the script again."
         )
+        print(f"{base_dir}")
         sys.exit()
     if len(os.listdir(original_images_dir)) == 0:
         print("No images detected. Script ending.")
@@ -108,7 +135,7 @@ def preprocess_files():
     )
     known_nudes = sorted(os.listdir(char_dir_nude))
     known_clothed = sorted(os.listdir(char_dir_clothed))
-    unmodified_images_int_only = []  # [char_entry_validation(i) for i in known_nudes]
+    unmodified_images_int_only = []
     entry_exists = []
     process_list = []
 
@@ -146,43 +173,13 @@ def preprocess_files():
             if not os.path.exists(path_simplified) and not os.path.exists(
                 path_simplified + i
             ):
-                # print(path_simplified)
-                # print(path_simplified + "\\" + i)
-                # print(f"debug1 | {i}")
                 entry_exists.append([i, False])
             else:
                 if i not in os.listdir(path_simplified):
-                    # print(f"debug2 | {i}")
                     entry_exists.append([i, False])
 
-    set1 = process_image_queue(process_list)
-    set2 = process_image_queue(entry_exists)
-    return set1, set2
-
-
-def process_image_queue(file_list):
-    """
-    Handles images and prepares them for spreading out of jobs
-    :param file_list: List of images. Includes the fill path to image.
-    :return: List of cut images. Sequence is preserved. FIFO.
-    """
-    try:
-        q = Queue(maxsize=0)
-        numthreads = min(15, len(file_list))
-        results = [{} for _ in file_list]
-        for i in range(len(file_list)):
-            q.put((i, file_list[i]))
-
-        for i in range(numthreads):
-            process = threading.Thread(target=process_image, args=(q, results))
-            process.daemon = True
-            process.start()
-        q.join()
-        if len(file_list) > 0:
-            print("All complete! Moving on.")
-        return results
-    except Exception as f:
-        logging.error(f"An error occurred: {f}")
+    process_list_queue(process_list, process_image)
+    process_list_queue(entry_exists, process_image)
 
 
 def process_image(q, results):
@@ -223,72 +220,58 @@ def process_image(q, results):
             nude = im.crop((0, 0, 1200, 1600))
 
         if not nude:
-            results[work[0]] = [clothed, filename]
+            char_val = char_entry_validation(filename)
+            char_dir_2 = os.listdir(char_dir_clothed)
+            char_save_dir = [
+                char_dir_clothed + "\\" + j
+                for j in char_dir_2
+                if char_val == char_entry_validation(j)
+            ]
+            clothed[0].save(os.path.join(char_save_dir[0], filename), "PNG")
+
         else:
-            results[work[0]] = [nude, clothed, filename]
+            run_this = [[nude, char_dir_nude], [clothed[0], char_dir_clothed]]
+            ran_once = False
+            for i in run_this:
+                process_image_2(i[0], i[1], filename)
+                if not ran_once:
+                    char_entry_img_extract(i[0], filename)
+
         q.task_done()
         print("New task done. " + str(work[0]) + "\n")
     return True
 
 
-def char_entry_img_extract():
+def process_image_2(char_sprite, image_dir, filename):
+    char_dir_exists = os.path.join(image_dir, filename)[:-4]
+    if not os.path.exists(char_dir_exists):
+        os.mkdir(char_dir_exists)
+    char_sprite.save(os.path.join(char_dir_exists, filename), "PNG")
+
+
+def char_entry_img_extract(img_base, filename2):
     """
     Extracts the char entry number as pixels in the top left, and saves them for separate use.
     :return: None
     """
-    img_set = os.listdir(char_dir_nude)
     char_sheet_init_dim = (0, 0, 125, 100)
     target_color = np.array(bg_colours[0])
-    for i in img_set:
-        filename = os.path.join(char_dir_entry, str(char_entry_validation(i)) + ".png")
-        # print(filename)
-        if not os.path.exists(filename):
-            im = Image.open(os.path.join(char_dir_nude, i, i + ".png"))
-            im1 = im.crop(char_sheet_init_dim)
-            im1 = im1.convert("RGBA")
-            image_array = img_to_numpy(im1)
-            image_array = image_array.copy()
-            mask = np.all(image_array == target_color, axis=-1)
-            image_array[mask, 3] = 0
-            modified_image = Image.fromarray(image_array)
-            modified_image.save(f"{filename}", "PNG")
-            # print(f"{i} character sheet number has been extracted and saved.")
+    filename = os.path.join(
+        char_dir_entry, str(char_entry_validation(filename2)) + ".png"
+    )
+    if not os.path.exists(filename):
+        im1 = img_base.crop(char_sheet_init_dim)
+        im1 = im1.convert("RGBA")
+        image_array = img_to_numpy(im1)
+        image_array = image_array.copy()
+        mask = np.all(image_array == target_color, axis=-1)
+        image_array[mask, 3] = 0
+        modified_image = Image.fromarray(image_array)
+        modified_image.save(f"{filename}", "PNG")
+        # print(f"{i} character sheet number has been extracted and saved.")
 
 
 # Step 3
-def sorting_files(image_set1, image_set2):
-    """
-    Image sorting into respective expected directories.
-    :param image_set1: List. Expected structure is: [[nude1,clothed1],[nude2, clothed2]...]
-    :param image_set2: List. Expected structure is: [clothed1, clothed 2...]
-    :return: None
-    """
-    for i in image_set1:
-        nude_char_sprite = i[0]
-        nude_char_dir = os.path.join(char_dir_nude, i[-1])[:-4]
-        if not os.path.exists(nude_char_dir):
-            os.mkdir(nude_char_dir)
-        nude_char_sprite.save(os.path.join(nude_char_dir, i[-1]), "PNG")
-
-        clothed_char_sprite = i[1]
-        clothed_char_dir = os.path.join(char_dir_clothed, i[-1])[:-4]
-        if not os.path.exists(clothed_char_dir):
-            os.mkdir(clothed_char_dir)
-        clothed_char_sprite[0].save(os.path.join(clothed_char_dir, i[-1]), "PNG")
-
-    for i in image_set2:
-        clothed_char_sprite = i[0]
-        char_val = char_entry_validation(i[-1])
-        char_dir_2 = os.listdir(char_dir_clothed)
-        char_save_dir = [
-            char_dir_clothed + "\\" + j
-            for j in char_dir_2
-            if char_val == char_entry_validation(j)
-        ]
-        clothed_char_sprite[0].save(os.path.join(char_save_dir[0], i[-1]), "PNG")
-
-
-# Step 4
 def request_images():
     """
     User inputs.
@@ -329,7 +312,10 @@ def request_images():
                                     )
                                 )
                             )
-                            file_mashup_name += f"{'&' if file_mashup_name else ''}({'_'.join([i[:3], 'N'])})"
+                            file_mashup_name += (
+                                f"{'&' if file_mashup_name else ''}"
+                                f"({'_'.join([char_entry_validation(i), 'N'])})"
+                            )
                     elif checkall == "c":
                         merge_images_clothed()
                     else:
@@ -449,7 +435,7 @@ def request_images_manual(char_count):
     return master_list, file_mashup_name
 
 
-# Step 5
+# Step 4
 def merge_images(images, filename):
     """
     Final Step. Combines individual image segments together.
@@ -518,10 +504,8 @@ def main():
     # Initial folder prerequisite checks
     folder_setup()
 
-    # Start checking if images are properly broken apart
-    image_set1, image_set2 = preprocess_files()
-    char_entry_img_extract()
-    sorting_files(image_set1, image_set2)
+    # Reads and processes images. If new originals are found, or new clothing, process and break them down.
+    preprocess_files()
 
     # Request user settings
     master_list, final_name = request_images()
