@@ -99,7 +99,7 @@ def process_list_queue(file_list, func_proc):
 # Step 1
 def folder_setup():
     """
-    Sets up and checks folder structure of all needed  directories.
+    Sets up and checks folder structure of all needed directories.
     :return: None
     """
     if not os.path.exists(original_images_dir):
@@ -107,7 +107,7 @@ def folder_setup():
             "Missing original images source. Please make a folder called 'Originals' in the same place as this file, "
             "and drop your image sheets within, then run the script again."
         )
-        print(f"{base_dir}")
+        print(f"Current Directory: {base_dir}")
         sys.exit()
     if len(os.listdir(original_images_dir)) == 0:
         print("No images detected. Script ending.")
@@ -350,14 +350,28 @@ def request_images_manual(char_count):
         v1 = True
         while v1:
             try:
+                verify = False
                 char_val = int(input("Who's next? Integers only! : "))
                 if char_val < 0:
                     raise ValueError("Negative integers are not allowed.")
-                for i in os.listdir(char_dir_nude):
-                    if char_val == char_entry_validation(i):
-                        print(f"Character sheet no. {char_val} found!")
-                        v1 = False
-                        break
+                else:
+                    char_verify = input(f"{char_val} entered! Correct? Y/N: ")
+                    while True:
+                        if char_verify in ["y", "n"]:
+                            if char_verify == "y":
+                                verify = True
+                            else:
+                                print("Understood. Trying again.")
+                                verify = False
+                            break
+                        else:
+                            print("Invalid input. Please enter Y or N.")
+                if verify:
+                    for i in os.listdir(char_dir_nude):
+                        if char_val == char_entry_validation(i):
+                            print(f"Character sheet no. {char_val} found!")
+                            v1 = False
+                            break
             except ValueError:
                 print("Invalid input. Please enter an integer.")
 
