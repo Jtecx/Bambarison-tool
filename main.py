@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from PIL import Image
 import numpy as np
 import os
@@ -18,11 +19,13 @@ char_dir_clothed = os.path.join(char_dir, "Clothed")
 char_dir_entry = os.path.join(char_dir, "Entry_Values")
 output_dir = os.path.join(base_dir, "Output")
 bg_colours = [[239, 239, 239, 255], [230, 230, 230, 255], [229, 229, 229, 255]]
+
+
 # White-ish grey, darker grey, and slightly more different darker grey.
 
 
 # Helper functions
-def char_entry_validation(char_entry):
+def char_entry_value_strip(char_entry):
     """
     Takes a string, spits out first set of integers
     :param char_entry: Type:String
@@ -39,7 +42,7 @@ def listdir_int_match(source, target):
     :return: String of int value.
     """
     try:
-        result = [j for j in source if str(char_entry_validation(target)) in j][0]
+        result = [j for j in source if str(char_entry_value_strip(str(target))) in j][0]
     except IndexError:
         print(f"{source} | {target}")
         result = "0"
@@ -140,7 +143,7 @@ def preprocess_files():
     process_list = []
 
     for i in unmodified_images:
-        char_val = char_entry_validation(i)
+        char_val = char_entry_value_strip(i)
         checking_filename = i[:-4]
 
         # Fresh entry, no nudes/clothes
@@ -220,12 +223,12 @@ def process_image(q, results):
             nude = im.crop((0, 0, 1200, 1600))
 
         if not nude:
-            char_val = char_entry_validation(filename)
+            char_val = char_entry_value_strip(filename)
             char_dir_2 = os.listdir(char_dir_clothed)
             char_save_dir = [
                 os.path.join(char_dir_clothed, j)
                 for j in char_dir_2
-                if char_val == char_entry_validation(j)
+                if char_val == char_entry_value_strip(j)
             ]
             clothed[0].save(os.path.join(char_save_dir[0], filename), "PNG")
 
@@ -257,7 +260,7 @@ def char_entry_img_extract(img_base, filename2):
     char_sheet_init_dim = (0, 0, 125, 100)
     target_color = np.array(bg_colours[0])
     filename = os.path.join(
-        char_dir_entry, str(char_entry_validation(filename2)) + ".png"
+        char_dir_entry, str(char_entry_value_strip(filename2)) + ".png"
     )
     if not os.path.exists(filename):
         im1 = img_base.crop(char_sheet_init_dim)
@@ -314,7 +317,7 @@ def request_images():
                             )
                             file_mashup_name += (
                                 f"{'&' if file_mashup_name else ''}"
-                                f"({'_'.join([str(char_entry_validation(i)), 'N'])})"
+                                f"({'_'.join([str(char_entry_value_strip(i)), 'N'])})"
                             )
                     elif checkall == "c":
                         merge_images_clothed()
@@ -368,7 +371,7 @@ def request_images_manual(char_count):
                             print("Invalid input. Please enter Y or N.")
                 if verify:
                     for i in os.listdir(char_dir_nude):
-                        if char_val == char_entry_validation(i):
+                        if char_val == char_entry_value_strip(i):
                             print(f"Character sheet no. {char_val} found!")
                             v1 = False
                             break
@@ -448,7 +451,7 @@ def request_images_manual(char_count):
                     )
                     file_mashup_name += (
                         f"{'&' if file_mashup_name else ''}"
-                        f"({'_'.join([str(char_val),'N'])})"
+                        f"({'_'.join([str(char_val), 'N'])})"
                     )
                 break
             else:
@@ -456,13 +459,99 @@ def request_images_manual(char_count):
     return master_list, file_mashup_name
 
 
+def request_images_automatic(spt_args):
+    n_integers = []
+    c_integers = []
+    n_filename = ""
+    c_filename = ""
+    merge_flag = True
+    current_flag = None
+
+    for item in spt_args:
+        if item == "-n":
+            current_flag = "n"
+        elif item == "-c":
+            current_flag = "c"
+        # elif item == "-m":
+        #     merge_flag = True
+        else:
+            if current_flag == "n":
+                # Learnt this is safer. Users may not put space between ints, this will prevent that from causing
+                # issues recognising proper character entries.
+                n_integers.extend(map(int, item.split(",")))
+                n_filename += (
+                    f"{'&' if n_filename else ''}"
+                    f"({'_'.join([str(item), current_flag])})"
+                )
+            elif current_flag == "c":
+                c_integers.extend(map(int, item.split(",")))
+                c_filename += (
+                    f"{'&' if c_filename else ''}"
+                    f"({'_'.join([str(item), current_flag])})"
+                )
+
+    n_result = request_images_automatic_extract(n_integers, True)
+    c_result = request_images_automatic_extract(c_integers, False)
+    merge_n = merge_images(n_result, n_filename, 0)
+    merge_c = merge_images(c_result, c_filename, 1)
+
+
+def request_images_automatic_extract(img_list, nude):
+    result = []
+    if nude:
+        char_path = char_dir_nude
+    else:
+        char_path = char_dir_clothed
+    for i in img_list:
+        file_confirm = ""
+        clothed_dir = os.path.join(
+            char_path, listdir_int_match(os.listdir(char_path), i)
+        )
+        clothed_check = os.listdir(clothed_dir)
+        if len(clothed_check) > 1:
+            file_found = False
+            for file1 in clothed_check:
+                correct_file = input(
+                    f'Is this the right file? "{file1}"  Y/N: '
+                ).lower()[:1]
+                verify = True
+                while verify:
+                    if correct_file in ["y", "n"]:
+                        if correct_file == "y":
+                            file_confirm = file1
+                            file_found = True
+                            break
+                        else:
+                            print("Understood. Trying again.")
+                        verify = False
+                    else:
+                        print("Invalid input. Please enter Y or N.")
+                if file_found:
+                    break
+            if not file_found:
+                print(
+                    f"Last one of Character entry no.{i} found. Since none was chosen, exiting."
+                )
+                sys.exit()
+        elif not clothed_check:
+            print(f"Character entry no.{i} found. Exiting.")
+            sys.exit()
+        else:
+            file_confirm = clothed_check[0]
+
+        result.append(Image.open(os.path.join(clothed_dir, file_confirm)))
+
+    return result
+
+
 # Step 4
-def merge_images(images, filename):
+def merge_images(images, filename, nude=0):
     """
     Final Step. Combines individual image segments together.
     :param images: Image list.
     :param filename: Name of file. Expects '(000_C/N)&...', but if longer than254, replace with alpha-numeric string
     of X len.
+    :param nude: Boolean. Checks if nude string required to append.
     :return: None
     """
     base_width = 1200  # Don't modify
@@ -487,9 +576,16 @@ def merge_images(images, filename):
         print(
             f"File name {filename}.png is too long. Replacing with a randomly generated string of numbers."
         )
-        filename = os.path.join(output_dir, str(random.randint(1, 999999))) + "_nude"
+        filename = os.path.join(output_dir, str(random.randint(1, 999999)))
+        if nude == 0:
+            filename += "_nude"
+        elif nude == 1:
+            filename += "_clothed"
+        else:
+            filename += "_merged"
     merged_image.save(f"{filename}.png", "PNG")
     print(f"File name {filename}.png saved!.")
+    return filename
 
 
 def merge_images_clothed():
@@ -522,6 +618,7 @@ def merge_images_clothed():
 
 # Main
 def main():
+    args_valid = False
     # Initial folder prerequisite checks
     folder_setup()
 
@@ -529,8 +626,26 @@ def main():
     preprocess_files()
 
     # Request user settings
-    master_list, final_name = request_images()
-    merge_images(master_list, final_name)
+    if sys.argv:
+        sys_args = sys.argv
+        sys_args.pop(0)
+        # for i in sys_args:
+        #     print(i)
+        # sys.exit()
+        if (sys_args[0] == "-n") or (sys_args[0] == "-c") or (sys_args[0] == "-m"):
+            if len(sys_args) >= 2:
+                request_images_automatic(sys_args)
+                args_valid = True
+            else:
+                print("Arguments malformed. Not enough parameters.")
+                sys.exit()
+        elif not sys.argv:
+            print("Arguments malformed. Start with -n or -c for nude/clothed.")
+            sys.exit()
+
+    if not args_valid:
+        master_list, final_name = request_images()
+        merge_images(master_list, final_name, 0)
 
 
 if __name__ == "__main__":
