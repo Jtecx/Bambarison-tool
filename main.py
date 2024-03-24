@@ -492,8 +492,10 @@ def request_images_automatic(spt_args):
 
     n_result = request_images_automatic_extract(n_integers, True)
     c_result = request_images_automatic_extract(c_integers, False)
-    merge_n = merge_images(n_result, n_filename, 0)
-    merge_c = merge_images(c_result, c_filename, 1)
+    if n_result:
+        merge_n = merge_images(n_result, n_filename, 0)
+    if c_result:
+        merge_c = merge_images(c_result, c_filename, 1)
 
 
 def request_images_automatic_extract(img_list, nude):
@@ -626,22 +628,20 @@ def main():
     preprocess_files()
 
     # Request user settings
-    if sys.argv:
+    if len(sys.argv) > 1:
         sys_args = sys.argv
-        sys_args.pop(0)
-        # for i in sys_args:
-        #     print(i)
-        # sys.exit()
-        if (sys_args[0] == "-n") or (sys_args[0] == "-c") or (sys_args[0] == "-m"):
-            if len(sys_args) >= 2:
-                request_images_automatic(sys_args)
-                args_valid = True
-            else:
-                print("Arguments malformed. Not enough parameters.")
+        if sys_args[0].replace("/", "\\") != __file__:
+            sys_args.pop(0)
+            if (sys_args[0] == "-n") or (sys_args[0] == "-c") or (sys_args[0] == "-m"):
+                if len(sys_args) >= 2:
+                    request_images_automatic(sys_args)
+                    args_valid = True
+                else:
+                    print("Arguments malformed. Not enough parameters.")
+                    sys.exit()
+            elif not sys.argv:
+                print("Arguments malformed. Start with -n or -c for nude/clothed.")
                 sys.exit()
-        elif not sys.argv:
-            print("Arguments malformed. Start with -n or -c for nude/clothed.")
-            sys.exit()
 
     if not args_valid:
         master_list, final_name = request_images()
