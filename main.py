@@ -202,6 +202,12 @@ def process_image(q, results):
         filename = work[1][0]
         cycled_once = False  # First image should always be nude
         im = Image.open(os.path.join(original_images_dir, filename))
+        if (im.width % 1200 > 0) or (im.height % 1600 > 0):
+            print(
+                f"{filename} is not a proper sheet. Dimensions should be H = 1600, "
+                f"W = 1200, or any multiple of W for character sheets. This one will be skipped."
+            )
+            q.task_done()
         for _ in range(int(im.width / 1200)):
             im1 = im.crop((y01, 0, y11, 1600))
             y01 = y11
@@ -551,7 +557,7 @@ def merge_images(images, filename, nude=0):
     """
     Final Step. Combines individual image segments together.
     :param images: Image list.
-    :param filename: Name of file. Expects '(000_C/N)&...', but if longer than254, replace with alpha-numeric string
+    :param filename: Name of file. Expects '(000_C/N)&...', but if longer than254, replace with alphanumeric string
     of X len.
     :param nude: Boolean. Checks if nude string required to append.
     :return: None
@@ -630,7 +636,7 @@ def main():
     # Request user settings
     if len(sys.argv) > 1:
         sys_args = sys.argv
-        if sys_args[0].replace("/", "\\") != __file__:
+        if os.path.normpath(sys_args[0]) != __file__:
             sys_args.pop(0)
             if (sys_args[0] == "-n") or (sys_args[0] == "-c") or (sys_args[0] == "-m"):
                 if len(sys_args) >= 2:
