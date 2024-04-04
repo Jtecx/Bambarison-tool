@@ -55,12 +55,14 @@ def listdir_int_match(source, target):
     :return: String of int value.
     """
     if isinstance(source, list):
-        source = [entry.name for entry in source]
+        source2 = [entry.name for entry in source]
     elif isinstance(source, Path):
-        source = [entry.name for entry in source.iterdir()]
+        source2 = [entry.name for entry in source.iterdir()]
 
     try:
-        result = [j for j in source if str(char_entry_value_strip(str(target))) in j][0]
+        result = [j for j in source2 if str(char_entry_value_strip(str(target))) in j][
+            0
+        ]
     except IndexError:
         logging.info("%s | %s", source, target)
         result = "0"
@@ -544,7 +546,6 @@ def request_images_automatic(spt_args):
                     f"{'&' if c_filename else ''}"
                     f"({'_'.join([str(item), current_flag])})"
                 )
-
     n_result = request_images_automatic_extract(n_integers, True)
     c_result = request_images_automatic_extract(c_integers, False)
     if n_result:
@@ -561,7 +562,7 @@ def request_images_automatic_extract(img_list, nude):
         char_path = script_globals.char_dir_clothed
     for i in img_list:
         file_confirm = ""
-        clothed_dir = char_path / listdir_int_match(os.listdir(char_path), i)
+        clothed_dir = char_path / listdir_int_match(char_path, i)
         clothed_check = list(clothed_dir.glob("*"))
         if len(clothed_check) > 1:
             file_found = False
@@ -678,34 +679,42 @@ def merge_images_clothed():
 
 # Main
 def main():
-    args_valid = False
-    # Initial folder prerequisite checks
-    folder_setup()
+    try:
+        args_valid = False
+        # Initial folder prerequisite checks
+        folder_setup()
 
-    # Reads and processes images. If new originals are found, or new clothing, process and break them down.
-    preprocess_files()
+        # Reads and processes images. If new originals are found, or new clothing, process and break them down.
+        preprocess_files()
 
-    # Request user settings
-    if len(sys.argv) > 1:
-        sys_args = sys.argv
-        print("Args currently broken. It's being looked into. Script exiting.")
+        # Request user settings
+        if len(sys.argv) > 1:
+            sys_args = sys.argv
+            # print("Args currently broken. It's being looked into. Script exiting.")
+            # sys.exit()
+            if os.path.normpath(sys_args[0]) != __file__:
+                sys_args.pop(0)
+                if (
+                    (sys_args[0] == "-n")
+                    or (sys_args[0] == "-c")
+                    or (sys_args[0] == "-m")
+                ):
+                    if len(sys_args) >= 2:
+                        request_images_automatic(sys_args)
+                        args_valid = True
+                    else:
+                        print("Arguments malformed. Not enough parameters.")
+                        sys.exit()
+                elif not sys.argv:
+                    print("Arguments malformed. Start with -n or -c for nude/clothed.")
+                    sys.exit()
+
+        if not args_valid:
+            master_list, final_name = request_images()
+            merge_images(master_list, final_name, 0)
+    except KeyboardInterrupt:
+        print("Interrupt caught. Exiting. Brace, brace, brace!")
         sys.exit()
-        # if os.path.normpath(sys_args[0]) != __file__:
-        #     sys_args.pop(0)
-        #     if (sys_args[0] == "-n") or (sys_args[0] == "-c") or (sys_args[0] == "-m"):
-        #         if len(sys_args) >= 2:
-        #             request_images_automatic(sys_args)
-        #             args_valid = True
-        #         else:
-        #             print("Arguments malformed. Not enough parameters.")
-        #             sys.exit()
-        #     elif not sys.argv:
-        #         print("Arguments malformed. Start with -n or -c for nude/clothed.")
-        #         sys.exit()
-
-    if not args_valid:
-        master_list, final_name = request_images()
-        merge_images(master_list, final_name, 0)
 
 
 if __name__ == "__main__":
