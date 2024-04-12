@@ -4,12 +4,12 @@ from PIL import Image
 import numpy as np
 import os
 import sys
-import re
-from queue import Queue
-import threading
 import math
 import logging
 from pathlib import Path
+from CoreSharedLibs import csl
+# You can get this (^) by running
+# pip install BTCoreSharedLibs
 
 
 # "Global" vars
@@ -34,104 +34,6 @@ script_globals = GlobalVars()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-
-
-# Helper functions
-def char_entry_value_strip(char_entry):
-    """
-    Takes a string, spits out first set of integers
-    :param char_entry: Type: String or Path
-    :return: Int
-    """
-    char_entry_str = str(char_entry)
-    return int(re.search(r"\d+", char_entry_str).group())
-
-
-def listdir_int_match(source, target):
-    """
-    Function to return first matching int file/folder name from list.
-    :param source: List of directory contents or Path object.
-    :param target: String to match against.
-    :return: String of int value.
-    """
-    if isinstance(source, list):
-        source2 = [entry.name for entry in source]
-    elif isinstance(source, Path):
-        source2 = [entry.name for entry in source.iterdir()]
-
-    try:
-        result = [j for j in source2 if str(char_entry_value_strip(str(target))) in j][
-            0
-        ]
-    except IndexError:
-        logging.info("%s | %s", source, target)
-        result = "0"
-    return result
-
-
-def img_to_numpy(image):
-    """
-    Converts Image to numpy, and skips over the annoying IDE warnings about unexpected type.
-    :param image: Image type
-    :return: Numpy array
-    """
-    return np.asarray(image)
-
-
-def background_only(image):
-    """
-    Checks for if the image is entirely background, no char sprites.
-    :param image: Image type. Takes in image to check.
-    :return: Boolean
-    """
-    # Convert the image to a NumPy array
-    image_array = img_to_numpy(image)
-
-    # Check if all elements of the array are the same
-    is_single_color = np.all(image_array == image_array[0])
-
-    return is_single_color
-
-
-def process_list_queue(file_list, func_proc):
-    """
-    Handles images and prepares them for spreading out of jobs
-    :param file_list: List of images. Includes the fill path to image.
-    :param func_proc: Function to multi-thread.
-    :return: List of cut images. Sequence is preserved. FIFO.
-    """
-    try:
-        q = Queue(maxsize=0)
-        numthreads = min(15, len(file_list))
-        results = [{} for _ in file_list]
-        for i in range(len(file_list)):
-            q.put((i, file_list[i]))
-
-        for i in range(numthreads):
-            process = threading.Thread(target=func_proc, args=(q, results))
-            process.daemon = True
-            process.start()
-        q.join()
-        if len(file_list) > 0:
-            print("All complete! Moving on.")
-        return results
-    except Exception as f:
-        logging.error(f"An error occurred: {f}")
-
-
-def get_filename_from_path(file_path):
-    # Define the regex pattern to match a filename
-    pattern = r"[\\/]([^\\/]+)$"
-
-    # Use re.search to find the last segment which is the filename
-    match = re.search(pattern, file_path)
-
-    if match:
-        # Return the matched filename
-        return match.group(1)
-    else:
-        # If no match found, return None
-        return None
 
 
 # Step 1
@@ -174,10 +76,10 @@ def preprocess_files():
     known_clothed = sorted(script_globals.char_dir_clothed.glob("*"))
     unmodified_images_int_only = []
     known_nudes_filenames = [
-        get_filename_from_path(str(path1)) for path1 in known_nudes
+        csl.get_filename_from_path(str(path1)) for path1 in known_nudes
     ]
     known_clothed_filenames = [
-        get_filename_from_path(str(file_path))[:-4]
+        csl.get_filename_from_path(str(file_path))[:-4]
         for path2 in known_clothed
         for file_path in path2.iterdir()
     ]
@@ -186,7 +88,7 @@ def preprocess_files():
 
     for image_path in unmodified_images:
         checking_filename = image_path.stem
-        char_val = char_entry_value_strip(checking_filename)
+        char_val = csl.char_entry_value_strip(checking_filename)
 
         # Fresh entry, no nudes/clothes
         if (
@@ -214,7 +116,7 @@ def preprocess_files():
                 )
 
             # Path only doesn't exist on first run, and this else only for multi-costumes.
-            path_simplified = script_globals.char_dir_clothed / listdir_int_match(
+            path_simplified = script_globals.char_dir_clothed / csl.listdir_int_match(
                 clothed_pre_creation_check, image_path.name
             )
             if (
@@ -227,9 +129,9 @@ def preprocess_files():
                     entry_exists.append([image_path, False])
 
     # print("1")
-    process_list_queue(process_list, process_image)  # looped
+    csl.process_list_queue(process_list, process_image)  # looped
     # print("2")
-    process_list_queue(entry_exists, process_image)
+    csl.process_list_queue(entry_exists, process_image)
     # print("3")
 
 
@@ -248,7 +150,7 @@ def process_image(q, results):
         clothed = []
         nude = False
         filedir = str(work[1][0])
-        filename = get_filename_from_path(filedir)[:-4]
+        filename = csl.get_filename_from_path(filedir)[:-4]
         cycled_once = False  # First image should always be nude
         im = Image.open(filedir)
         if (im.width % 1200 > 0) or (im.height % 1600 > 0):
@@ -262,7 +164,7 @@ def process_image(q, results):
             im1 = im.crop((y01, 0, y11, 1600))
             y01 = y11
             y11 += 1200
-            if not background_only(im1):
+            if not csl.background_only(im1):
                 if work[1][1]:
                     if not nude:
                         nude = im1
@@ -279,12 +181,12 @@ def process_image(q, results):
         #     nude = im.crop((0, 0, 1200, 1600))
 
         if not nude:
-            char_val = char_entry_value_strip(filename)
+            char_val = csl.char_entry_value_strip(filename)
             char_dir_2 = list(script_globals.char_dir_clothed.glob("*"))
             char_save_dir = [
                 dir_entry
                 for dir_entry in char_dir_2
-                if char_val == char_entry_value_strip(dir_entry.name)
+                if char_val == csl.char_entry_value_strip(dir_entry.name)
             ]
             clothed[0].save(str(char_save_dir[0] / filename) + ".png", "PNG")
 
@@ -334,12 +236,12 @@ def char_entry_img_extract(img_base, filename2):
     char_sheet_init_dim = (0, 0, 125, 100)
     target_color = np.array(script_globals.bg_colours[0])
     filename = (
-        script_globals.char_dir_entry / f"{char_entry_value_strip(filename2)}.png"
+        script_globals.char_dir_entry / f"{csl.char_entry_value_strip(filename2)}.png"
     )
     if not filename.exists():
         im1 = img_base.crop(char_sheet_init_dim)
         im1 = im1.convert("RGBA")
-        image_array = img_to_numpy(im1)
+        image_array = csl.img_to_numpy(im1)
         image_array = image_array.copy()
         mask = np.all(image_array == target_color, axis=-1)
         image_array[mask, 3] = 0
@@ -389,7 +291,7 @@ def request_images():
                             )
                             file_mashup_name += (
                                 f"{'&' if file_mashup_name else ''}"
-                                f"({'_'.join([str(char_entry_value_strip(i.name)), 'N'])})"
+                                f"({'_'.join([str(csl.char_entry_value_strip(i.name)), 'N'])})"
                             )
                     elif checkall == "c":
                         merge_images_clothed()
@@ -447,11 +349,11 @@ def request_images_manual(char_count):
                             print("Invalid input. Please enter Y or N.")
                 if verify:
                     for entry in script_globals.char_dir_nude.glob("*"):
-                        temp = char_entry_value_strip(entry.name)
-                        if char_val == char_entry_value_strip(entry.name):
+                        temp = csl.char_entry_value_strip(entry.name)
+                        if char_val == csl.char_entry_value_strip(entry.name):
                             print(f"Character sheet no. {char_val} found!")
                             v1 = False
-                            char_val = get_filename_from_path(str(entry))
+                            char_val = csl.get_filename_from_path(str(entry))
                             break
                     if v1:
                         raise ValueError
@@ -562,7 +464,7 @@ def request_images_automatic_extract(img_list, nude):
         char_path = script_globals.char_dir_clothed
     for i in img_list:
         file_confirm = ""
-        clothed_dir = char_path / listdir_int_match(char_path, i)
+        clothed_dir = char_path / csl.listdir_int_match(char_path, i)
         clothed_check = list(clothed_dir.glob("*"))
         if len(clothed_check) > 1:
             file_found = False
