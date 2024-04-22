@@ -2,7 +2,7 @@
 Builds images for comparison purposes by stacking them side by side. Console only, designed for Lewdiverse from MXDX
 
 Requirements:
-Pillow, numpy, queue, threading, logging.
+Pillow, Numpy, BTCoreSharedLibs.
 
 Tested on Python 3.11
 

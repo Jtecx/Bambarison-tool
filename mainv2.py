@@ -59,11 +59,11 @@ def image_validation(clothed_check, i=-1):
     # return_status = True
     if len(clothed_check) > 1:
         for file1 in clothed_check:
-            correct_file = input(
-                f'Is this the right file? "{file1.name}"  Y/N: '
-            ).lower()[:1]
             verify = True
             while verify:
+                correct_file = input(
+                    f'Is this the right file? "{file1.name}"  Y/N: '
+                ).lower()[:1]
                 if correct_file in ["y", "n"]:
                     if correct_file == "y":
                         file_name = file1.stem
@@ -277,8 +277,8 @@ def process_image_2(char_sprite, image_dir, filename):
 
         # Save the image inside the directory
         char_sprite.save(str(char_dir_exists / filename) + ".png", "PNG")
-    except Exception as e:
-        logging.error(f"Error: {e} + {char_sprite}")
+    except Exception:
+        logging.exception("Error: ")
 
 
 def char_entry_img_extract(img_base, filename2):
@@ -471,7 +471,7 @@ def request_images_automatic(spt_args):
         else:
             if current_flag == "n":
                 # Learnt this is safer. Users may not put space between ints, this will prevent that from causing
-                # issues recognising proper character entries.
+                # issues recognizing proper character entries.
                 n_integers.extend(map(int, item.split(",")))
                 n_filename += (
                     f"{'&' if n_filename else ''}"
