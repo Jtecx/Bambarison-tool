@@ -43,7 +43,7 @@ def file_finder(char_val, v1):
     for i in script_globals.char_dir_nude.glob("*"):
         entry = i.name
         if char_val == csl.char_entry_value_strip(entry):
-            print(f"Character sheet no. {char_val} found!")
+            logging.info(f"Character sheet no. {char_val} found!")
             v1 = False
             break
     if v1:
@@ -71,14 +71,14 @@ def image_validation(clothed_check, i=-1):
                         file_found = True
                         break
                     else:
-                        print("Understood. Trying again.")
+                        logging.info("Understood. Trying again.")
                     verify = False
                 else:
-                    print("Invalid input. Please enter Y or N.")
+                    logging.warning("Invalid input. Please enter Y or N.")
             if file_found:
                 break
         if not file_found:
-            print(f"Last one of Character entry no.{i} found.")
+            logging.warning(f"Last one of Character entry no.{i} found.")
     else:
         file_name = clothed_check[0].stem
         file_path = clothed_check[0]
@@ -102,11 +102,11 @@ def folder_setup():
     ]
 
     if not script_globals.original_images_dir.exists():
-        print(
+        logging.warning(
             "Missing original images source. Please make a folder called 'Originals' in the same place as this file, "
             "and drop your image sheets within, then run the script again."
         )
-        print(f"Current Directory: {script_globals.base_dir}")
+        logging.info(f"Current Directory: {script_globals.base_dir}")
         sys.exit()
 
     for directory in directories:
@@ -183,11 +183,11 @@ def preprocess_files():
                     elif i + 1 == len(temp1):
                         entry_exists.append([image_path, False])
 
-    # print("1")
+    # logging.warning("1")
     csl.process_list_queue(process_list, process_image)  # looped
-    # print("2")
+    # logging.warning("2")
     csl.process_list_queue(entry_exists, process_image)
-    # print("3")
+    # logging.warning("3")
 
 
 # noinspection PyUnusedLocal
@@ -275,13 +275,10 @@ def process_image_2(char_sprite, image_dir, filename):
             # Set permissions for the directory (read, write, execute for owner, read and execute for group and others)
             char_dir_exists.chmod(0o755)  # Adjust permissions as needed
 
-        # print("error")
         # Save the image inside the directory
         char_sprite.save(str(char_dir_exists / filename) + ".png", "PNG")
     except Exception as e:
-        print("error\n")
-        print(e)
-        print(char_sprite)
+        logging.error(f"Error: {e} + {char_sprite}")
 
 
 def char_entry_img_extract(img_base, filename2):
@@ -315,8 +312,8 @@ def begin_interface_opt():
                 input(
                     "What job are you running?"
                     "\n 1 for comparing a list of chars"
-                    "\n 2 for comparing a singular char against multiple"
-                    "\nInput: "
+                    # "\n 2 for comparing a singular char against multiple"
+                    "\n Input: "
                 )
             )
             if chosen_val in valid_entries:
@@ -349,7 +346,7 @@ def request_images():
                 raise ValueError("Negative integers are not allowed.")
             break
         except ValueError:
-            print("Invalid input. Please enter an integer.")
+            logging.warning("Invalid input. Please enter an integer.")
 
     master_list = []
     file_mashup_name = ""
@@ -383,7 +380,7 @@ def request_images():
                 else:
                     raise ValueError("Invalid input. Try again.")
             except ValueError:
-                print("Invalid input.")
+                logging.warning("Invalid input.")
     else:
         master_list, file_mashup_name = request_images_manual(char_count)
 
@@ -399,10 +396,10 @@ def request_images_manual(char_count):
     """
     file_mashup_name = ""
     master_list = []
-    print("Manual selection time!")
+    logging.info("Manual selection time!")
 
     while char_count != 0:
-        print(f"You have {char_count} left.")
+        logging.info(f"You have {char_count} left.")
         char_count -= 1
         char_val = 0
         v1 = True
@@ -415,7 +412,7 @@ def request_images_manual(char_count):
                 else:
                     raise ValueError
             except ValueError:
-                print("File not found..")
+                logging.warning("File not found..")
 
         while True:
             clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
@@ -434,7 +431,7 @@ def request_images_manual(char_count):
                         master_list.append(Image.open(file_path))
                     else:
                         char_count += 1
-                        print("File not found. Returning an entry to loop.")
+                        logging.warning("File not found. Returning an entry to loop.")
                 else:
                     char_content = script_globals.char_dir_nude / str(char_val)
                     master_list.append(Image.open(next(char_content.glob("*"))))
@@ -444,7 +441,7 @@ def request_images_manual(char_count):
                     )
                 break
             else:
-                print("Invalid input. Please enter Y or N.")
+                logging.warning("Invalid input. Please enter Y or N.")
     return master_list, file_mashup_name
 
 
@@ -466,8 +463,6 @@ def request_images_automatic(spt_args):
         elif item == "-an":
             dir_list = sorted(script_globals.char_dir_nude.glob("*"))
             n_integers = [i.glob("*") for i in dir_list]
-            # print(n_integers)
-            # sys.exit()
             break
         elif item == "-ac":
             dir_list = sorted(script_globals.char_dir_clothed.glob("*"))
@@ -550,7 +545,7 @@ def merge_images(images, filename, nude=0):
     output_dir = script_globals.output_dir
     filename_path = Path(output_dir) / f"{filename}.png"
     if len(str(filename_path)) > 254:
-        print(
+        logging.info(
             f"File name {filename_path} is too long. Replacing with a randomly generated string of numbers."
         )
         filename_path = Path(output_dir) / str(int(time.time()))
@@ -561,7 +556,7 @@ def merge_images(images, filename, nude=0):
         else:
             filename_path = Path(str(filename_path) + "_merged").with_suffix(".png")
     merged_image.save(filename_path)
-    print(f"File name {filename_path} saved!.")
+    logging.info(f"File name {filename_path} saved!.")
     return filename_path
 
 
@@ -593,7 +588,7 @@ def merge_images_clothed():
 
     filename = output_dir / f"{time.time()}_clothed.png"
     merged_image.save(filename)
-    print(f"File name {filename} saved!.")
+    logging.info(f"File name {filename} saved!.")
     sys.exit()
 
 
@@ -620,10 +615,12 @@ def main():
                         request_images_automatic(sys_args)
                         args_valid = True
                     else:
-                        print("Arguments malformed. Not enough parameters.")
+                        logging.warning("Arguments malformed. Not enough parameters.")
                         sys.exit()
                 elif not sys.argv:
-                    print("Arguments malformed. Start with -n or -c for nude/clothed.")
+                    logging.warning(
+                        "Arguments malformed. Start with -n or -c for nude/clothed."
+                    )
                     sys.exit()
 
         if not args_valid:
@@ -634,7 +631,7 @@ def main():
             # if menu_selection == 2:
             #     master_list, final_name = request_images_singular_char()
     except KeyboardInterrupt:
-        print("\nInterrupt caught. Exiting. Brace, brace, brace!")
+        logging.warning("\nInterrupt caught. Exiting. Brace, brace, brace!")
         sys.exit()
 
 
