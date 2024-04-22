@@ -34,7 +34,7 @@ class GlobalVars:
 script_globals = GlobalVars()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', level=logging.INFO)
 
 
 # Shared re-usable functions
@@ -43,7 +43,7 @@ def file_finder(char_val, v1):
     for i in script_globals.char_dir_nude.glob("*"):
         entry = i.name
         if char_val == csl.char_entry_value_strip(entry):
-            logging.info(f"Character sheet no. {char_val} found!")
+            print(f"Character sheet no. {char_val} found!")
             v1 = False
             break
     if v1:
@@ -71,7 +71,7 @@ def image_validation(clothed_check, i=-1):
                         file_found = True
                         break
                     else:
-                        logging.info("Understood. Trying again.")
+                        print("Understood. Trying again.")
                     verify = False
                 else:
                     logging.warning("Invalid input. Please enter Y or N.")
@@ -106,7 +106,7 @@ def folder_setup():
             "Missing original images source. Please make a folder called 'Originals' in the same place as this file, "
             "and drop your image sheets within, then run the script again."
         )
-        logging.info(f"Current Directory: {script_globals.base_dir}")
+        print(f"Current Directory: {script_globals.base_dir}")
         sys.exit()
 
     for directory in directories:
@@ -396,10 +396,10 @@ def request_images_manual(char_count):
     """
     file_mashup_name = ""
     master_list = []
-    logging.info("Manual selection time!")
+    print("Manual selection time!")
 
     while char_count != 0:
-        logging.info(f"You have {char_count} left.")
+        print(f"You have {char_count} left.")
         char_count -= 1
         char_val = 0
         v1 = True
@@ -556,7 +556,7 @@ def merge_images(images, filename, nude=0):
         else:
             filename_path = Path(str(filename_path) + "_merged").with_suffix(".png")
     merged_image.save(filename_path)
-    logging.info(f"File name {filename_path} saved!.")
+    print(f"File name {filename_path} saved!.")
     return filename_path
 
 
@@ -588,7 +588,7 @@ def merge_images_clothed():
 
     filename = output_dir / f"{time.time()}_clothed.png"
     merged_image.save(filename)
-    logging.info(f"File name {filename} saved!.")
+    print(f"File name {filename} saved!.")
     sys.exit()
 
 
