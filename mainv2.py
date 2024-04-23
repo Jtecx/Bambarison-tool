@@ -34,29 +34,43 @@ class GlobalVars:
 script_globals = GlobalVars()
 
 # Configure logging
-logging.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S", level=logging.INFO
+)
 
 
 # Shared re-usable functions
-def file_finder(char_val, v1):
+def file_finder(char_val, v1):  # , nude):
+    """
+    Finds if a file exists or not.
+    :param char_val: Int, character sheet
+    :param v1: Boolean, used for loop verification.
+    :return: v1 for loop breaking if found, and which file matched.
+    """
     entry = ""
-    for i in script_globals.char_dir_nude.glob("*"):
+    # if nude:
+    char_dir = script_globals.char_dir_nude.glob("*")
+    # else:
+    #     char_dir = script_globals.char_dir_clothed.walk()
+    for i in char_dir:
         entry = i.name
         if char_val == csl.char_entry_value_strip(entry):
             print(f"Character sheet no. {char_val} found!")
             v1 = False
             break
-    if v1:
-        return False, v1, entry
-    else:
-        return True, v1, entry
+    return v1, entry
 
 
 def image_validation(clothed_check, i=-1):
+    """
+    Image validation for clothed results.
+    :param clothed_check: List, list of dirs matching the char int requested.
+    :param i: Int, character entry number.
+    :return: Exact file name (str), path to file(Str/Path), and if file was found (Bool).
+    """
     file_name = ""
     file_path = ""
     file_found = False
-    # return_status = True
     if len(clothed_check) > 1:
         for file1 in clothed_check:
             verify = True
@@ -406,7 +420,7 @@ def request_images_manual(char_count):
         while v1:
             try:
                 char_val = csl.validate_int_input()
-                result, v1, char_val = file_finder(char_val, v1)
+                result, char_val = file_finder(char_val, v1)
                 if result:
                     break
                 else:
@@ -511,8 +525,14 @@ def request_images_automatic_extract(img_list, nude):
 
 
 def request_images_singular_char():
+    loop_breaker = True
     main_char = ""
-    return main_char, "test"
+    while loop_breaker:
+        print("Who do you wanna compare the others against?")
+        main_char_int = csl.validate_int_input()
+        loop_breaker, main_char = file_finder(main_char_int, loop_breaker)
+        # image_validation()
+    return main_char, "test", 0
 
 
 # Step 4
@@ -624,12 +644,26 @@ def main():
                     sys.exit()
 
         if not args_valid:
-            menu_selection = begin_interface_opt()
+            # menu_selection = begin_interface_opt()
+            menu_selection = 1
             if menu_selection == 1:
                 master_list, final_name = request_images()
                 merge_images(master_list, final_name, 0)
-            # if menu_selection == 2:
-            #     master_list, final_name = request_images_singular_char()
+            # elif menu_selection == 2:
+            #     master_list, final_name, nude_status = request_images_singular_char()
+            #     merge_images(master_list, final_name, nude_status)
+            # elif menu_selection == 3:
+            #     print("Printing nude walk result:\n\n")
+            #     print(script_globals.char_dir_nude.walk())
+            #     print("\n\nPrint complete. Printing nude glob result:\n\n")
+            #     print(script_globals.char_dir_nude.glob("*"))
+            #     print("\n\nPrint complete.")
+            else:
+                logging.error(
+                    "Invalid menu selection was passed. This should not be possible. "
+                    "Panic calmly and abort."
+                )
+            sys.exit()
     except KeyboardInterrupt:
         logging.warning("\nInterrupt caught. Exiting. Brace, brace, brace!")
         sys.exit()
@@ -641,5 +675,4 @@ if __name__ == "__main__":
 # TODO:
 #
 # Pixel background strip colour?
-# Int / str input validation function move to CoreSharedLibs
-# Pypy to replace python interpreter?
+# Str input validation function move to CoreSharedLibs
