@@ -8,6 +8,9 @@ import math
 import logging
 from pathlib import Path
 from CoreSharedLibs import csl
+
+import test as t1
+
 # You can get this (^) by running
 # pip install BTCoreSharedLibs
 
@@ -34,6 +37,27 @@ script_globals = GlobalVars()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+
+
+# More stuff to move over to BTCoreSharedLibs
+
+def begin_interface_opt():
+    chosen_val = 0
+    valid_entries = [i + 1 for i in range(2)]
+    while True:
+        try:
+            chosen_val = int(input("What job are you running?"
+                                   "\n 1 for comparing a list of chars"
+                                   "\n 2 for comparing a singular char against multiple"
+                                   "\nInput: "))
+            if chosen_val in valid_entries:
+                break
+            else:
+                raise ValueError
+        except ValueError:
+            logging.warning("Input is invalid. Integers ONLY.")
+
+    return chosen_val
 
 
 # Step 1
@@ -76,13 +100,21 @@ def preprocess_files():
     known_clothed = sorted(script_globals.char_dir_clothed.glob("*"))
     unmodified_images_int_only = []
     known_nudes_filenames = [
-        csl.get_filename_from_path(str(path1)) for path1 in known_nudes
+        path1.name for path1 in known_nudes
     ]
     known_clothed_filenames = [
-        csl.get_filename_from_path(str(file_path))[:-4]
+        file_path.stem
+        # for file_path2 in list(known_clothed.rglob("*"))
         for path2 in known_clothed
-        for file_path in path2.iterdir()
+        for file_path in path2.glob("*")
     ]
+    # Path doesn't exist on first run with multi-costume. It's okay, we can just get the expected file_dir from
+    # original.
+    clothed_pre_creation_check = sorted(script_globals.char_dir_clothed.glob("*"))
+    if not clothed_pre_creation_check:
+        clothed_pre_creation_check = sorted(
+            script_globals.original_images_dir.glob("*")
+        )
     entry_exists = []
     process_list = []
 
@@ -92,41 +124,39 @@ def preprocess_files():
 
         # Fresh entry, no nudes/clothes
         if (
-            checking_filename not in known_nudes_filenames
-            and checking_filename not in known_clothed_filenames
-            and char_val not in unmodified_images_int_only
+                checking_filename not in known_nudes_filenames
+                and checking_filename not in known_clothed_filenames
+                and char_val not in unmodified_images_int_only
         ):
             unmodified_images_int_only.append(char_val)
             process_list.append([image_path, True])
 
         # Char is run once already, has an entry, but may be having extra costumes.
         elif checking_filename in known_nudes and (
-            char_val not in unmodified_images_int_only
+                char_val not in unmodified_images_int_only
         ):
             unmodified_images_int_only.append(char_val)
 
         # Char has extra costumes. Folder uses first known image, so future new costumes should never match.
         else:
-            # Path doesn't exist on first run with multi-costume. It's okay, we can just get the expected file_dir from
-            # original.
-            clothed_pre_creation_check = list(script_globals.char_dir_clothed.iterdir())
-            if not clothed_pre_creation_check:
-                clothed_pre_creation_check = list(
-                    script_globals.original_images_dir.iterdir()
-                )
-
             # Path only doesn't exist on first run, and this else only for multi-costumes.
             path_simplified = script_globals.char_dir_clothed / csl.listdir_int_match(
                 clothed_pre_creation_check, image_path.name
             )
             if (
-                not path_simplified.exists()
-                and not (path_simplified / image_path.name).exists()
+                    not path_simplified.exists()
+                    and not (path_simplified / image_path.name).exists()
             ):
                 entry_exists.append([image_path, False])
             else:
-                if image_path.name not in os.listdir(path_simplified):
-                    entry_exists.append([image_path, False])
+                temp1 = sorted(path_simplified.glob("*"))
+                temp2 = image_path.name
+                for i in range(len(temp1)):
+                    temp3 = temp1[i].name
+                    if temp2 in temp3:
+                        break
+                    elif i+1 == len(temp1):
+                        entry_exists.append([image_path, False])
 
     # print("1")
     csl.process_list_queue(process_list, process_image)  # looped
@@ -149,8 +179,8 @@ def process_image(q, results):
         logging.info("New task started. %s", str(work[0]))
         clothed = []
         nude = False
-        filedir = str(work[1][0])
-        filename = csl.get_filename_from_path(filedir)[:-4]
+        filedir = work[1][0]
+        filename = filedir.name
         cycled_once = False  # First image should always be nude
         im = Image.open(filedir)
         if (im.width % 1200 > 0) or (im.height % 1600 > 0):
@@ -236,7 +266,7 @@ def char_entry_img_extract(img_base, filename2):
     char_sheet_init_dim = (0, 0, 125, 100)
     target_color = np.array(script_globals.bg_colours[0])
     filename = (
-        script_globals.char_dir_entry / f"{csl.char_entry_value_strip(filename2)}.png"
+            script_globals.char_dir_entry / f"{csl.char_entry_value_strip(filename2)}.png"
     )
     if not filename.exists():
         im1 = img_base.crop(char_sheet_init_dim)
@@ -274,7 +304,8 @@ def request_images():
 
     master_list = []
     file_mashup_name = ""
-    if char_count == len(list(script_globals.char_dir_nude.glob("*"))):
+    char_dir_nude_list = sorted(script_globals.char_dir_nude.glob("*"))
+    if char_count == len(list(char_dir_nude_list)):
         while True:
             try:
                 checkall = input(
@@ -282,7 +313,7 @@ def request_images():
                 ).lower()[:1]
                 if checkall in ["n", "c"]:
                     if checkall == "n":
-                        for i in script_globals.char_dir_nude.glob("*"):
+                        for i in char_dir_nude_list:
                             char_full_path = i
                             master_list.append(
                                 Image.open(
@@ -310,6 +341,19 @@ def request_images():
     return master_list, file_mashup_name
 
 
+def file_finder(char_val, v1):
+    for i in script_globals.char_dir_nude.glob("*"):
+        entry = i.name
+        if char_val == csl.char_entry_value_strip(entry):
+            print(f"Character sheet no. {char_val} found!")
+            v1 = False
+            char_val = entry
+    if v1:
+        return False, v1, char_val
+    else:
+        return True, v1, char_val
+
+
 def request_images_manual(char_count):
     """
     Manual selection of images to merge together.
@@ -329,45 +373,24 @@ def request_images_manual(char_count):
         while v1:
             try:
                 verify = False
-                char_val = int(input("Who's next? Integers only! : "))
-                if char_val < 0:
-                    raise ValueError("Negative integers are not allowed.")
+                char_val = csl.validate_int_input()
+                result, v1, char_val = file_finder(char_val, v1)
+                if result:
+                    break
                 else:
-                    char_verify = input(f"{char_val} entered! Correct? Y/N: ").lower()[
-                        :1
-                    ]
-                    while True:
-                        if char_verify in ["y", "n"]:
-                            if char_verify == "y":
-                                print("Understood. Moving on.")
-                                verify = True
-                            else:
-                                print("Understood. Trying again.")
-                                verify = False
-                            break
-                        else:
-                            print("Invalid input. Please enter Y or N.")
-                if verify:
-                    for entry in script_globals.char_dir_nude.glob("*"):
-                        temp = csl.char_entry_value_strip(entry.name)
-                        if char_val == csl.char_entry_value_strip(entry.name):
-                            print(f"Character sheet no. {char_val} found!")
-                            v1 = False
-                            char_val = csl.get_filename_from_path(str(entry))
-                            break
-                    if v1:
-                        raise ValueError
+                    raise ValueError
             except ValueError:
-                print("Invalid input. Please enter an integer.")
+                print("File not found..")
 
         while True:
             clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
             if clothes in ["y", "n"]:
                 if clothes == "y":
                     char_content = script_globals.char_dir_clothed / str(char_val)
-                    if len(list(char_content.glob("*"))) > 1:
+                    char_content_data = list(char_content.glob("*"))
+                    if len(char_content_data) > 1:
                         file_found = False
-                        for file1 in char_content.glob("*"):
+                        for file1 in char_content_data:
                             correct_file = input(
                                 f'Is this the right file? "{file1.name}"  Y/N: '
                             ).lower()[:1]
@@ -423,16 +446,26 @@ def request_images_automatic(spt_args):
     c_integers = []
     n_filename = ""
     c_filename = ""
-    merge_flag = True
+    merge_flag = False
     current_flag = None
 
     for item in spt_args:
+        # if item == "-m":
+        #     merge_flag = True
         if item == "-n":
             current_flag = "n"
         elif item == "-c":
             current_flag = "c"
-        # elif item == "-m":
-        #     merge_flag = True
+        elif item == "-an":
+            dir_list = sorted(script_globals.char_dir_nude.glob("*"))
+            n_integers = [i.glob("*") for i in dir_list]
+            # print(n_integers)
+            # sys.exit()
+            break
+        elif item == "-ac":
+            dir_list = sorted(script_globals.char_dir_clothed.glob("*"))
+            c_integers = [i.glob("*") for i in dir_list]
+            break
         else:
             if current_flag == "n":
                 # Learnt this is safer. Users may not put space between ints, this will prevent that from causing
@@ -463,43 +496,17 @@ def request_images_automatic_extract(img_list, nude):
     else:
         char_path = script_globals.char_dir_clothed
     for i in img_list:
-        file_confirm = ""
         clothed_dir = char_path / csl.listdir_int_match(char_path, i)
         clothed_check = list(clothed_dir.glob("*"))
-        if len(clothed_check) > 1:
-            file_found = False
-            for file1 in clothed_check:
-                correct_file = input(
-                    f'Is this the right file? "{file1.name}"  Y/N: '
-                ).lower()[:1]
-                verify = True
-                while verify:
-                    if correct_file in ["y", "n"]:
-                        if correct_file == "y":
-                            file_confirm = file1.name
-                            file_found = True
-                            break
-                        else:
-                            print("Understood. Trying again.")
-                        verify = False
-                    else:
-                        print("Invalid input. Please enter Y or N.")
-                if file_found:
-                    break
-            if not file_found:
-                print(
-                    f"Last one of Character entry no.{i} found. Since none was chosen, exiting."
-                )
-                sys.exit()
-        elif not clothed_check:
-            print(f"Character entry no.{i} found. Exiting.")
-            sys.exit()
-        else:
-            file_confirm = clothed_check[0].name
-
+        file_confirm = t1.script_test(clothed_dir, clothed_check)
         result.append(Image.open(clothed_dir / file_confirm))
 
     return result
+
+
+def request_images_singular_char():
+    main_char = ""
+    return "test", "test"
 
 
 # Step 4
@@ -533,7 +540,7 @@ def merge_images(images, filename, nude=0):
     filename_path = Path(output_dir) / f"{filename}.png"
     if len(str(filename_path)) > 254:
         print(
-            f"File name {filename_path}.png is too long. Replacing with a randomly generated string of numbers."
+            f"File name {filename_path} is too long. Replacing with a randomly generated string of numbers."
         )
         filename_path = Path(output_dir) / str(int(time.time()))
         if nude == 0:
@@ -583,6 +590,7 @@ def merge_images_clothed():
 def main():
     try:
         args_valid = False
+        args_valid_flags = ["-n", "-c", "-m", "-an", "-ac"]
         # Initial folder prerequisite checks
         folder_setup()
 
@@ -592,16 +600,14 @@ def main():
         # Request user settings
         if len(sys.argv) > 1:
             sys_args = sys.argv
-            # print("Args currently broken. It's being looked into. Script exiting.")
-            # sys.exit()
-            if os.path.normpath(sys_args[0]) != __file__:
+            first_arg = sys_args[0]
+            if os.path.normpath(first_arg) != __file__:
                 sys_args.pop(0)
+                first_arg = sys_args[0]
                 if (
-                    (sys_args[0] == "-n")
-                    or (sys_args[0] == "-c")
-                    or (sys_args[0] == "-m")
+                        (first_arg in args_valid_flags)
                 ):
-                    if len(sys_args) >= 2:
+                    if len(sys_args) >= 2 or first_arg == "-an" or first_arg == "-ac":
                         request_images_automatic(sys_args)
                         args_valid = True
                     else:
@@ -612,10 +618,14 @@ def main():
                     sys.exit()
 
         if not args_valid:
-            master_list, final_name = request_images()
-            merge_images(master_list, final_name, 0)
+            menu_selection = begin_interface_opt()
+            if menu_selection == 1:
+                master_list, final_name = request_images()
+                merge_images(master_list, final_name, 0)
+            if menu_selection == 2:
+                master_list, final_name = request_images_singular_char()
     except KeyboardInterrupt:
-        print("Interrupt caught. Exiting. Brace, brace, brace!")
+        print("\nInterrupt caught. Exiting. Brace, brace, brace!")
         sys.exit()
 
 
@@ -625,3 +635,5 @@ if __name__ == "__main__":
 # TODO:
 #
 # Pixel background strip colour?
+# Int / str input validation function move to CoreSharedLibs
+# Pypy to replace python interpreter?
