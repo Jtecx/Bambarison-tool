@@ -40,24 +40,26 @@ logging.basicConfig(
 
 
 # Shared re-usable functions
-def file_finder(char_val, v1):  # , nude):
+def file_finder(char_val):  # , nude):
     """
     Finds if a file exists or not.
     :param char_val: Int, character sheet
-    :param v1: Boolean, used for loop verification.
     :return: v1 for loop breaking if found, and which file matched.
     """
+    v1 = False
     entry = ""
     # if nude:
-    char_dir = script_globals.char_dir_nude.glob("*")
+    char_dir = sorted(script_globals.char_dir_nude.glob("*"))
     # else:
     #     char_dir = script_globals.char_dir_clothed.walk()
     for i in char_dir:
         entry = i.name
-        if char_val == csl.char_entry_value_strip(entry):
+        test_against = csl.char_entry_value_strip(entry)
+        if char_val == test_against:
             print(f"Character sheet no. {char_val} found!")
-            v1 = False
+            v1 = True
             break
+    logging.info(entry)
     return v1, entry
 
 
@@ -424,11 +426,10 @@ def request_images_manual(char_count):
         print(f"You have {char_count} left.")
         char_count -= 1
         char_val = 0
-        v1 = True
-        while v1:
+        while True:
             try:
                 char_val = csl.validate_int_input()
-                result, char_val = file_finder(char_val, v1)
+                result, char_val = file_finder(char_val)
                 if result:
                     break
                 else:
@@ -443,7 +444,7 @@ def request_images_manual(char_count):
                     char_content = script_globals.char_dir_clothed / char_val
                     char_content_data = sorted(char_content.glob("*"))
                     file_name, file_path, re_status = image_validation(
-                        char_content_data, char_val
+                        char_content_data, csl.char_entry_value_strip(char_val)
                     )
                     if re_status:
                         file_mashup_name += (
@@ -538,7 +539,7 @@ def request_images_singular_char():
     while loop_breaker:
         print("Who do you wanna compare the others against?")
         main_char_int = csl.validate_int_input()
-        loop_breaker, main_char = file_finder(main_char_int, loop_breaker)
+        loop_breaker, main_char = file_finder(main_char_int)
         # image_validation()
     return main_char, "test", 0
 
