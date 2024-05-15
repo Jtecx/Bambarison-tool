@@ -9,8 +9,6 @@ import logging
 from pathlib import Path
 from CoreSharedLibs import csl
 
-import test as t1
-
 # You can get this (^) by running
 # pip install BTCoreSharedLibs
 
@@ -36,28 +34,71 @@ class GlobalVars:
 script_globals = GlobalVars()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S", level=logging.INFO
+)
 
 
-# More stuff to move over to BTCoreSharedLibs
+# Shared re-usable functions
+def file_finder(char_val, v1):  # , nude):
+    """
+    Finds if a file exists or not.
+    :param char_val: Int, character sheet
+    :param v1: Boolean, used for loop verification.
+    :return: v1 for loop breaking if found, and which file matched.
+    """
+    entry = ""
+    # if nude:
+    char_dir = script_globals.char_dir_nude.glob("*")
+    # else:
+    #     char_dir = script_globals.char_dir_clothed.walk()
+    for i in char_dir:
+        entry = i.name
+        if char_val == csl.char_entry_value_strip(entry):
+            print(f"Character sheet no. {char_val} found!")
+            v1 = False
+            break
+    return v1, entry
 
-def begin_interface_opt():
-    chosen_val = 0
-    valid_entries = [i + 1 for i in range(2)]
-    while True:
-        try:
-            chosen_val = int(input("What job are you running?"
-                                   "\n 1 for comparing a list of chars"
-                                   "\n 2 for comparing a singular char against multiple"
-                                   "\nInput: "))
-            if chosen_val in valid_entries:
+
+def image_validation(clothed_check, i=-1):
+    """
+    Image validation for clothed results.
+    :param clothed_check: List, list of dirs matching the char int requested.
+    :param i: Int, character entry number.
+    :return: Exact file name (str), path to file(Str/Path), and if file was found (Bool).
+    """
+    file_name = ""
+    file_path = ""
+    file_found = False
+    if len(clothed_check) > 1:
+        for file1 in clothed_check:
+            verify = True
+            while verify:
+                correct_file = input(
+                    f'Is this the right file? "{file1.name}"  Y/N: '
+                ).lower()[:1]
+                if correct_file in ["y", "n"]:
+                    if correct_file == "y":
+                        file_name = file1.stem
+                        file_path = file1
+                        file_found = True
+                        break
+                    else:
+                        print("Understood. Trying again.")
+                    verify = False
+                else:
+                    logging.warning("Invalid input. Please enter Y or N.")
+            if file_found:
                 break
-            else:
-                raise ValueError
-        except ValueError:
-            logging.warning("Input is invalid. Integers ONLY.")
+        if not file_found:
+            logging.warning(f"Last one of Character entry no.{i} found.")
+    else:
+        file_name = clothed_check[0].stem
+        file_path = clothed_check[0]
+        file_found = True
 
-    return chosen_val
+    return file_name, file_path, file_found
 
 
 # Step 1
@@ -75,7 +116,7 @@ def folder_setup():
     ]
 
     if not script_globals.original_images_dir.exists():
-        print(
+        logging.warning(
             "Missing original images source. Please make a folder called 'Originals' in the same place as this file, "
             "and drop your image sheets within, then run the script again."
         )
@@ -99,9 +140,7 @@ def preprocess_files():
     known_nudes = sorted(script_globals.char_dir_nude.glob("*"))
     known_clothed = sorted(script_globals.char_dir_clothed.glob("*"))
     unmodified_images_int_only = []
-    known_nudes_filenames = [
-        path1.name for path1 in known_nudes
-    ]
+    known_nudes_filenames = [path1.stem for path1 in known_nudes]
     known_clothed_filenames = [
         file_path.stem
         # for file_path2 in list(known_clothed.rglob("*"))
@@ -139,6 +178,14 @@ def preprocess_files():
 
         # Char has extra costumes. Folder uses first known image, so future new costumes should never match.
         else:
+            # Path doesn't exist on first run with multi-costume. It's okay, we can just get the expected file_dir from
+            # original.
+            # clothed_pre_creation_check = list(script_globals.char_dir_clothed.iterdir())
+            # if not clothed_pre_creation_check:
+            #     clothed_pre_creation_check = list(
+            #         script_globals.original_images_dir.iterdir()
+            #     )
+
             # Path only doesn't exist on first run, and this else only for multi-costumes.
             path_simplified = script_globals.char_dir_clothed / csl.listdir_int_match(
                 clothed_pre_creation_check, image_path.name
@@ -158,13 +205,14 @@ def preprocess_files():
                     elif i+1 == len(temp1):
                         entry_exists.append([image_path, False])
 
-    # print("1")
+    # logging.warning("1")
     csl.process_list_queue(process_list, process_image)  # looped
-    # print("2")
+    # logging.warning("2")
     csl.process_list_queue(entry_exists, process_image)
-    # print("3")
+    # logging.warning("3")
 
 
+# noinspection PyUnusedLocal
 def process_image(q, results):
     """
     Cutting images based on parameters.
@@ -180,7 +228,7 @@ def process_image(q, results):
         clothed = []
         nude = False
         filedir = work[1][0]
-        filename = filedir.name
+        filename = filedir.stem
         cycled_once = False  # First image should always be nude
         im = Image.open(filedir)
         if (im.width % 1200 > 0) or (im.height % 1600 > 0):
@@ -249,13 +297,10 @@ def process_image_2(char_sprite, image_dir, filename):
             # Set permissions for the directory (read, write, execute for owner, read and execute for group and others)
             char_dir_exists.chmod(0o755)  # Adjust permissions as needed
 
-        # print("error")
         # Save the image inside the directory
         char_sprite.save(str(char_dir_exists / filename) + ".png", "PNG")
-    except Exception as e:
-        print("error\n")
-        print(e)
-        print(char_sprite)
+    except Exception:
+        logging.exception("Error: ")
 
 
 def char_entry_img_extract(img_base, filename2):
@@ -280,6 +325,29 @@ def char_entry_img_extract(img_base, filename2):
         # logging.info("%s character sheet number has been extracted and saved.", filename2)
 
 
+# Step 2.5
+def begin_interface_opt():
+    valid_entries = [i + 1 for i in range(2)]
+    while True:
+        try:
+            chosen_val = int(
+                input(
+                    "What job are you running?"
+                    "\n 1 for comparing a list of chars"
+                    # "\n 2 for comparing a singular char against multiple"
+                    "\n Input: "
+                )
+            )
+            if chosen_val in valid_entries:
+                break
+            else:
+                raise ValueError
+        except ValueError:
+            logging.warning("Input is invalid. Integers ONLY.")
+
+    return chosen_val
+
+
 # Step 3
 def request_images():
     """
@@ -300,7 +368,7 @@ def request_images():
                 raise ValueError("Negative integers are not allowed.")
             break
         except ValueError:
-            print("Invalid input. Please enter an integer.")
+            logging.warning("Invalid input. Please enter an integer.")
 
     master_list = []
     file_mashup_name = ""
@@ -334,24 +402,11 @@ def request_images():
                 else:
                     raise ValueError("Invalid input. Try again.")
             except ValueError:
-                print("Invalid input.")
+                logging.warning("Invalid input.")
     else:
         master_list, file_mashup_name = request_images_manual(char_count)
 
     return master_list, file_mashup_name
-
-
-def file_finder(char_val, v1):
-    for i in script_globals.char_dir_nude.glob("*"):
-        entry = i.name
-        if char_val == csl.char_entry_value_strip(entry):
-            print(f"Character sheet no. {char_val} found!")
-            v1 = False
-            char_val = entry
-    if v1:
-        return False, v1, char_val
-    else:
-        return True, v1, char_val
 
 
 def request_images_manual(char_count):
@@ -372,62 +427,33 @@ def request_images_manual(char_count):
         v1 = True
         while v1:
             try:
-                verify = False
                 char_val = csl.validate_int_input()
-                result, v1, char_val = file_finder(char_val, v1)
+                result, char_val = file_finder(char_val, v1)
                 if result:
                     break
                 else:
                     raise ValueError
             except ValueError:
-                print("File not found..")
+                logging.warning("File not found..")
 
         while True:
             clothes = input("Should they wear clothes? Y/N: ").lower()[:1]
             if clothes in ["y", "n"]:
                 if clothes == "y":
-                    char_content = script_globals.char_dir_clothed / str(char_val)
-                    char_content_data = list(char_content.glob("*"))
-                    if len(char_content_data) > 1:
-                        file_found = False
-                        for file1 in char_content_data:
-                            correct_file = input(
-                                f'Is this the right file? "{file1.name}"  Y/N: '
-                            ).lower()[:1]
-                            verify = True
-                            while verify:
-                                if correct_file in ["y", "n"]:
-                                    if correct_file == "y":
-                                        master_list.append(Image.open(file1))
-                                        file_mashup_name += (
-                                            f"{'&' if file_mashup_name else ''}"
-                                            f"({'_'.join([str(char_val), 'C'])})"
-                                        )
-                                        file_found = True
-                                        break
-                                    else:
-                                        print("Understood. Trying again.")
-                                    verify = False
-                                else:
-                                    print("Invalid input. Please enter Y or N.")
-                            if file_found:
-                                break
-                        if not file_found:
-                            print(
-                                f"Last one of Character entry no.{char_val} found. Since none was chosen, looping."
-                            )
-                            char_count += 1
+                    char_content = script_globals.char_dir_clothed / char_val
+                    char_content_data = sorted(char_content.glob("*"))
+                    file_name, file_path, re_status = image_validation(
+                        char_content_data, char_val
+                    )
+                    if re_status:
+                        file_mashup_name += (
+                            f"{'&' if file_mashup_name else ''}"
+                            f"({'_'.join([str(file_name), 'C'])})"
+                        )
+                        master_list.append(Image.open(file_path))
                     else:
-                        try:
-                            master_list.append(Image.open(next(char_content.glob("*"))))
-                            file_mashup_name += (
-                                f"{'&' if file_mashup_name else ''}"
-                                f"({'_'.join([str(char_val), 'C'])})"
-                            )
-                        except StopIteration:
-                            for i in char_content.glob("*"):
-                                print(i)
-                            sys.exit()
+                        char_count += 1
+                        logging.warning("File not found. Returning an entry to loop.")
                 else:
                     char_content = script_globals.char_dir_nude / str(char_val)
                     master_list.append(Image.open(next(char_content.glob("*"))))
@@ -437,7 +463,7 @@ def request_images_manual(char_count):
                     )
                 break
             else:
-                print("Invalid input. Please enter Y or N.")
+                logging.warning("Invalid input. Please enter Y or N.")
     return master_list, file_mashup_name
 
 
@@ -446,7 +472,7 @@ def request_images_automatic(spt_args):
     c_integers = []
     n_filename = ""
     c_filename = ""
-    merge_flag = False
+    # merge_flag = False
     current_flag = None
 
     for item in spt_args:
@@ -459,8 +485,6 @@ def request_images_automatic(spt_args):
         elif item == "-an":
             dir_list = sorted(script_globals.char_dir_nude.glob("*"))
             n_integers = [i.glob("*") for i in dir_list]
-            # print(n_integers)
-            # sys.exit()
             break
         elif item == "-ac":
             dir_list = sorted(script_globals.char_dir_clothed.glob("*"))
@@ -469,7 +493,7 @@ def request_images_automatic(spt_args):
         else:
             if current_flag == "n":
                 # Learnt this is safer. Users may not put space between ints, this will prevent that from causing
-                # issues recognising proper character entries.
+                # issues recognizing proper character entries.
                 n_integers.extend(map(int, item.split(",")))
                 n_filename += (
                     f"{'&' if n_filename else ''}"
@@ -484,9 +508,9 @@ def request_images_automatic(spt_args):
     n_result = request_images_automatic_extract(n_integers, True)
     c_result = request_images_automatic_extract(c_integers, False)
     if n_result:
-        merge_n = merge_images(n_result, n_filename, 0)
+        merge_images(n_result, n_filename, 0)
     if c_result:
-        merge_c = merge_images(c_result, c_filename, 1)
+        merge_images(c_result, c_filename, 1)
 
 
 def request_images_automatic_extract(img_list, nude):
@@ -497,16 +521,26 @@ def request_images_automatic_extract(img_list, nude):
         char_path = script_globals.char_dir_clothed
     for i in img_list:
         clothed_dir = char_path / csl.listdir_int_match(char_path, i)
-        clothed_check = list(clothed_dir.glob("*"))
-        file_confirm = t1.script_test(clothed_dir, clothed_check)
-        result.append(Image.open(clothed_dir / file_confirm))
+        clothed_check = sorted(clothed_dir.glob("*"))
+        file_name, file_path, re_status = image_validation(clothed_check, i)
+        if re_status:
+            result.append(Image.open(clothed_dir / file_path))
+        else:
+            logging.warning("Error. File not found. Aborting.")
+            sys.exit()
 
     return result
 
 
 def request_images_singular_char():
+    loop_breaker = True
     main_char = ""
-    return "test", "test"
+    while loop_breaker:
+        print("Who do you wanna compare the others against?")
+        main_char_int = csl.validate_int_input()
+        loop_breaker, main_char = file_finder(main_char_int, loop_breaker)
+        # image_validation()
+    return main_char, "test", 0
 
 
 # Step 4
@@ -539,7 +573,7 @@ def merge_images(images, filename, nude=0):
     output_dir = script_globals.output_dir
     filename_path = Path(output_dir) / f"{filename}.png"
     if len(str(filename_path)) > 254:
-        print(
+        logging.info(
             f"File name {filename_path} is too long. Replacing with a randomly generated string of numbers."
         )
         filename_path = Path(output_dir) / str(int(time.time()))
@@ -604,28 +638,42 @@ def main():
             if os.path.normpath(first_arg) != __file__:
                 sys_args.pop(0)
                 first_arg = sys_args[0]
-                if (
-                        (first_arg in args_valid_flags)
-                ):
+                if first_arg in args_valid_flags:
                     if len(sys_args) >= 2 or first_arg == "-an" or first_arg == "-ac":
                         request_images_automatic(sys_args)
                         args_valid = True
                     else:
-                        print("Arguments malformed. Not enough parameters.")
+                        logging.warning("Arguments malformed. Not enough parameters.")
                         sys.exit()
                 elif not sys.argv:
-                    print("Arguments malformed. Start with -n or -c for nude/clothed.")
+                    logging.warning(
+                        "Arguments malformed. Start with -n or -c for nude/clothed."
+                    )
                     sys.exit()
 
         if not args_valid:
-            menu_selection = begin_interface_opt()
+            # menu_selection = begin_interface_opt()
+            menu_selection = 1
             if menu_selection == 1:
                 master_list, final_name = request_images()
                 merge_images(master_list, final_name, 0)
-            if menu_selection == 2:
-                master_list, final_name = request_images_singular_char()
+            # elif menu_selection == 2:
+            #     master_list, final_name, nude_status = request_images_singular_char()
+            #     merge_images(master_list, final_name, nude_status)
+            # elif menu_selection == 3:
+            #     print("Printing nude walk result:\n\n")
+            #     print(script_globals.char_dir_nude.walk())
+            #     print("\n\nPrint complete. Printing nude glob result:\n\n")
+            #     print(script_globals.char_dir_nude.glob("*"))
+            #     print("\n\nPrint complete.")
+            else:
+                logging.error(
+                    "Invalid menu selection was passed. This should not be possible. "
+                    "Panic calmly and abort."
+                )
+            sys.exit()
     except KeyboardInterrupt:
-        print("\nInterrupt caught. Exiting. Brace, brace, brace!")
+        logging.warning("\nInterrupt caught. Exiting. Brace, brace, brace!")
         sys.exit()
 
 
@@ -635,5 +683,4 @@ if __name__ == "__main__":
 # TODO:
 #
 # Pixel background strip colour?
-# Int / str input validation function move to CoreSharedLibs
-# Pypy to replace python interpreter?
+# Str input validation function move to CoreSharedLibs
