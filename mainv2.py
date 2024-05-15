@@ -163,16 +163,16 @@ def preprocess_files():
 
         # Fresh entry, no nudes/clothes
         if (
-                checking_filename not in known_nudes_filenames
-                and checking_filename not in known_clothed_filenames
-                and char_val not in unmodified_images_int_only
+            checking_filename not in known_nudes_filenames
+            and checking_filename not in known_clothed_filenames
+            and char_val not in unmodified_images_int_only
         ):
             unmodified_images_int_only.append(char_val)
             process_list.append([image_path, True])
 
         # Char is run once already, has an entry, but may be having extra costumes.
         elif checking_filename in known_nudes and (
-                char_val not in unmodified_images_int_only
+            char_val not in unmodified_images_int_only
         ):
             unmodified_images_int_only.append(char_val)
 
@@ -191,8 +191,8 @@ def preprocess_files():
                 clothed_pre_creation_check, image_path.name
             )
             if (
-                    not path_simplified.exists()
-                    and not (path_simplified / image_path.name).exists()
+                not path_simplified.exists()
+                and not (path_simplified / image_path.name).exists()
             ):
                 entry_exists.append([image_path, False])
             else:
@@ -202,7 +202,7 @@ def preprocess_files():
                     temp3 = temp1[i].name
                     if temp2 in temp3:
                         break
-                    elif i+1 == len(temp1):
+                    elif i + 1 == len(temp1):
                         entry_exists.append([image_path, False])
 
     # logging.warning("1")
@@ -311,7 +311,7 @@ def char_entry_img_extract(img_base, filename2):
     char_sheet_init_dim = (0, 0, 125, 100)
     target_color = np.array(script_globals.bg_colours[0])
     filename = (
-            script_globals.char_dir_entry / f"{csl.char_entry_value_strip(filename2)}.png"
+        script_globals.char_dir_entry / f"{csl.char_entry_value_strip(filename2)}.png"
     )
     if not filename.exists():
         im1 = img_base.crop(char_sheet_init_dim)
