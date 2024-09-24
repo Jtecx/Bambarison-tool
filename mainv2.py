@@ -286,6 +286,7 @@ def process_image(q, results):
     return True
 
 
+# noinspection PyBroadException
 def process_image_2(char_sprite, image_dir, filename):
     try:
         # Construct the full path including the filename
