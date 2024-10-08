@@ -598,10 +598,12 @@ def merge_images(images, filename, nude=0):
 
     if file_quality == 0:
         filename_path = filename_path.with_suffix(".png")
+        merged_image.save(filename_path, optimize=True)
     else:
         filename_path = filename_path.with_suffix(".jpg")
+        merged_image.save(filename_path, optimize=True, keep_rgb=True)
 
-    merged_image.save(filename_path, optimize=True)
+
     print(f"File name {filename_path} saved!.")
     return filename_path
 
