@@ -573,19 +573,35 @@ def merge_images(images, filename, nude=0):
             width = 0
             height += base_height
     output_dir = script_globals.output_dir
-    filename_path = Path(output_dir) / f"{filename}.png"
+
+    while True:
+        try:
+            file_quality = int(input("Lossless(0) or Lossy(1)?"))
+            if file_quality not in [0, 1]:
+                raise ValueError("Negative integers are not allowed.")
+            break
+        except ValueError:
+            logging.warning("Invalid input. Please enter an integer.")
+
+    filename_path = Path(output_dir) / f"{filename}"
     if len(str(filename_path)) > 254:
         logging.info(
             f"File name {filename_path} is too long. Replacing with a randomly generated string of numbers."
         )
         filename_path = Path(output_dir) / str(int(time.time()))
         if nude == 0:
-            filename_path = Path(str(filename_path) + "_nude").with_suffix(".png")
+            filename_path = Path(str(filename_path) + "_nude")
         elif nude == 1:
-            filename_path = Path(str(filename_path) + "_clothed").with_suffix(".png")
+            filename_path = Path(str(filename_path) + "_clothed")
         else:
-            filename_path = Path(str(filename_path) + "_merged").with_suffix(".png")
-    merged_image.save(filename_path)
+            filename_path = Path(str(filename_path) + "_merged")
+
+    if file_quality == 0:
+        filename_path = filename_path.with_suffix(".png")
+    else:
+        filename_path = filename_path.with_suffix(".jpg")
+
+    merged_image.save(filename_path, optimize=True)
     print(f"File name {filename_path} saved!.")
     return filename_path
 
