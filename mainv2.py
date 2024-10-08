@@ -373,44 +373,55 @@ def request_images():
         except ValueError:
             logging.warning("Invalid input. Please enter an integer.")
 
-    master_list = []
-    file_mashup_name = ""
     char_dir_nude_list = sorted(script_globals.char_dir_nude.glob("*"))
     if char_count == len(list(char_dir_nude_list)):
-        while True:
-            try:
-                checkall = input(
-                    "Same number of total files detected! Did you want to do a full nude/clothed lineup? N/C: "
-                ).lower()[:1]
-                if checkall in ["n", "c"]:
-                    if checkall == "n":
-                        for i in char_dir_nude_list:
-                            char_full_path = i
-                            master_list.append(
-                                Image.open(
-                                    char_full_path / next(char_full_path.glob("*"))
-                                )
-                            )
-                            file_mashup_name += (
-                                f"{'&' if file_mashup_name else ''}"
-                                f"({'_'.join([str(csl.char_entry_value_strip(i.name)), 'N'])})"
-                            )
-                    elif checkall == "c":
-                        merge_images_clothed()
-                    else:
-                        master_list, file_mashup_name = request_images_manual(
-                            char_count
-                        )
-                    break
-                else:
-                    raise ValueError("Invalid input. Try again.")
-            except ValueError:
-                logging.warning("Invalid input.")
+        print("Same number of total files detected!")
+        master_list, file_mashup_name = nude_or_clothed(char_dir_nude_list, char_count)
     else:
+        # sequential = input("Is this sequential or random? Y/N: ").lower()[:1]
+        # if sequential in ["y", "n"]:
+        #     if sequential == "n":
         master_list, file_mashup_name = request_images_manual(char_count)
+            # else:
+            #     master_list, file_mashup_name = nude_or_clothed(char_dir_nude_list, char_count)
 
     return master_list, file_mashup_name
 
+
+def nude_or_clothed(char_dir_nude_list, char_count):
+    master_list = []
+    file_mashup_name = ""
+    while True:
+        try:
+            checkall = input(
+                "Did you want to do a full nude/clothed lineup? N/C: "
+            ).lower()[:1]
+            if checkall in ["n", "c"]:
+                if checkall == "n":
+                    for i in char_dir_nude_list:
+                        char_full_path = i
+                        master_list.append(
+                            Image.open(
+                                char_full_path / next(char_full_path.glob("*"))
+                            )
+                        )
+                        file_mashup_name += (
+                            f"{'&' if file_mashup_name else ''}"
+                            f"({'_'.join([str(csl.char_entry_value_strip(i.name)), 'N'])})"
+                        )
+                elif checkall == "c":
+                    merge_images_clothed()
+                # else:
+                #     master_list, file_mashup_name = request_images_manual(
+                #         char_count
+                #     )
+                break
+            else:
+                raise ValueError("Invalid input. Try again.")
+        except ValueError:
+            logging.warning("Invalid input.")
+
+    return master_list, file_mashup_name
 
 def request_images_manual(char_count):
     """
@@ -576,9 +587,9 @@ def merge_images(images, filename, nude=0):
 
     while True:
         try:
-            file_quality = int(input("Lossless(0) or Lossy(1)?"))
+            file_quality = int(input("Lossless(0) or Lossy(1)? :"))
             if file_quality not in [0, 1]:
-                raise ValueError("Negative integers are not allowed.")
+                raise ValueError("Invalid integer inputted. Please use 0 or 1.")
             break
         except ValueError:
             logging.warning("Invalid input. Please enter an integer.")
@@ -596,12 +607,41 @@ def merge_images(images, filename, nude=0):
         else:
             filename_path = Path(str(filename_path) + "_merged")
 
+    ##Used for webp support
+    maxsize = (16000, 16000)
+    merged_image.thumbnail(maxsize, Image.Resampling.LANCZOS)
+
     if file_quality == 0:
-        filename_path = filename_path.with_suffix(".png")
-        merged_image.save(filename_path, optimize=True)
-    else:
-        filename_path = filename_path.with_suffix(".jpg")
-        merged_image.save(filename_path, optimize=True, keep_rgb=True)
+        # filename_path = filename_path.with_suffix(".png")
+        # merged_image.save(filename_path, optimize=True)
+
+        filename_path_lossless = filename_path.with_suffix(".webp")
+        merged_image.save(filename_path_lossless, lossless=True, quality=100, method=6)
+        print(f"File name {filename_path_lossless} saved!.")
+
+    elif file_quality == 1:
+        # filename_path = filename_path.with_suffix(".jpg")
+        # merged_image.save(filename_path, optimize=True, keep_rgb=True)
+
+        filename_path_lossy = filename_path.with_suffix(".webp")
+        merged_image.save(filename_path_lossy, quality=100, method=6)
+        print(f"File name {filename_path_lossy} saved!.")
+
+    # else:
+        # starttime = time.time()
+        # maxsize = (16000, 16000)
+        # merged_image.thumbnail(maxsize, Image.Resampling.LANCZOS)
+        #
+        # filename_path_lossless = filename_path.with_suffix(".webp")
+        # merged_image.save(filename_path_lossless, lossless=True, quality=100, method=6)
+        # print(f"File name {filename_path_lossless} saved!.")
+        #
+        # filename_path_lossy = filename_path.with_suffix(".webp")
+        # merged_image.save(filename_path_lossy, quality=100, method=6)
+        # print(f"File name {filename_path_lossy} saved!.")
+
+        # endtime = time.time() - starttime
+        # logging.info(endtime)
 
 
     print(f"File name {filename_path} saved!.")
