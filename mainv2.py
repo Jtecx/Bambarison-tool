@@ -686,9 +686,9 @@ def merge_images_clothed():
                 y += 1200
         x += 1600
         y = 0
-    logging.info(merged_image.width)
-    logging.info(merged_image.height)
-    merged_image.show()
+    # logging.info(merged_image.width)
+    # logging.info(merged_image.height)
+    # merged_image.show()
     filename = output_dir / f"{time.time()}_clothed.png"
     merged_image.save(filename)
     print(f"File name {filename} saved!.")
