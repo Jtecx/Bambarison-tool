@@ -207,11 +207,11 @@ def preprocess_files():
                     elif i + 1 == len(temp1):
                         entry_exists.append([image_path, False])
 
-    logging.warning("1")
+    # logging.warning("1")
     csl.process_list_queue(process_list, process_image)  # looped
-    logging.warning("2")
+    # logging.warning("2")
     csl.process_list_queue(entry_exists, process_image)
-    logging.warning("3")
+    # logging.warning("3")
 
 
 # noinspection PyUnusedLocal
@@ -466,7 +466,7 @@ def request_images_manual(char_count):
             if clothes in ["y", "n"]:
                 if clothes == "y":
                     char_content = script_globals.char_dir_clothed / char_val
-                    char_content_data = sorted(char_content.glob("*"))
+                    char_content_data = sorted(char_content.glob("*.png"))
                     file_name, file_path, re_status = image_validation(
                         char_content_data, csl.char_entry_value_strip(char_val)
                     )
@@ -481,7 +481,7 @@ def request_images_manual(char_count):
                         logging.warning("File not found. Returning an entry to loop.")
                 else:
                     char_content = script_globals.char_dir_nude / str(char_val)
-                    master_list.append(Image.open(next(char_content.glob("*"))))
+                    master_list.append(Image.open(next(char_content.glob("*.png"))))
                     file_mashup_name += (
                         f"{'&' if file_mashup_name else ''}"
                         f"({'_'.join([str(char_val), 'N'])})"
@@ -686,9 +686,6 @@ def merge_images_clothed():
                 y += 1200
         x += 1600
         y = 0
-    # logging.info(merged_image.width)
-    # logging.info(merged_image.height)
-    # merged_image.show()
     filename = output_dir / f"{time.time()}_clothed.png"
     merged_image.save(filename)
     print(f"File name {filename} saved!.")
