@@ -199,7 +199,7 @@ def preprocess_files():
                 entry_exists.append([image_path, False])
             else:
                 temp1 = sorted(path_simplified.glob("*"))
-                temp2 = image_path.name
+                temp2 = image_path.name[:-4]
                 for i in range(len(temp1)):
                     temp3 = temp1[i].name
                     if temp2 in temp3:
@@ -207,11 +207,11 @@ def preprocess_files():
                     elif i + 1 == len(temp1):
                         entry_exists.append([image_path, False])
 
-    # logging.warning("1")
+    logging.warning("1")
     csl.process_list_queue(process_list, process_image)  # looped
-    # logging.warning("2")
+    logging.warning("2")
     csl.process_list_queue(entry_exists, process_image)
-    # logging.warning("3")
+    logging.warning("3")
 
 
 # noinspection PyUnusedLocal
@@ -244,6 +244,7 @@ def process_image(q, results):
             im1 = im.crop((y01, 0, y11, 1600))
             y01 = y11
             y11 += 1200
+            # im1.show()
             if not csl.background_only(im1):
                 if work[1][1]:
                     if not nude:
@@ -253,8 +254,6 @@ def process_image(q, results):
                 else:
                     if cycled_once:
                         clothed.append(im1)
-            else:
-                break
             cycled_once = True
 
         # if work[1][1]:
@@ -273,13 +272,20 @@ def process_image(q, results):
         else:
             run_this = [
                 [nude, script_globals.char_dir_nude],
-                [clothed[0], script_globals.char_dir_clothed],
+                [clothed, script_globals.char_dir_clothed],
             ]
             ran_once = False
+            counter = 0
             for i in run_this:
-                process_image_2(i[0], i[1], filename)
+                if isinstance(i[0], list):
+                    for j in i[0]:
+                        process_image_2(j,i[1],filename, filename + str(counter))
+                        counter += 1
+                else:
+                    process_image_2(i[0], i[1], filename)
                 if not ran_once:
                     char_entry_img_extract(i[0], filename)
+                    ran_once = True
 
         q.task_done()
         logging.info("New task done. %s", str(work[0]))
@@ -287,10 +293,10 @@ def process_image(q, results):
 
 
 # noinspection PyBroadException
-def process_image_2(char_sprite, image_dir, filename):
+def process_image_2(char_sprite, image_dir, filebasedir, altclothes = ""):
     try:
         # Construct the full path including the filename
-        char_dir_exists = Path(image_dir) / filename
+        char_dir_exists = Path(image_dir) / filebasedir
 
         # Create the directory if it doesn't exist
         if not char_dir_exists.exists():
@@ -301,7 +307,12 @@ def process_image_2(char_sprite, image_dir, filename):
             char_dir_exists.chmod(0o755)  # Adjust permissions as needed
 
         # Save the image inside the directory
-        char_sprite.save(str(char_dir_exists / filename) + ".png", "PNG")
+        if altclothes:
+            char_sprite.save(str(char_dir_exists / altclothes) + ".png", "PNG")
+        else:
+            char_sprite.save(str(char_dir_exists / filebasedir) + ".png", "PNG")
+        filemade = open(char_dir_exists/filebasedir, "w")
+        filemade.close()
     except Exception:
         logging.exception("Error: ")
 
@@ -422,6 +433,7 @@ def nude_or_clothed(char_dir_nude_list, char_count):
             logging.warning("Invalid input.")
 
     return master_list, file_mashup_name
+
 
 def request_images_manual(char_count):
     """
