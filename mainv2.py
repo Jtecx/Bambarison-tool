@@ -413,7 +413,7 @@ def nude_or_clothed(char_dir_nude_list, char_count):
                         char_full_path = i
                         master_list.append(
                             Image.open(
-                                char_full_path / next(char_full_path.glob("*"))
+                                char_full_path / next(char_full_path.glob("*.png"))
                             )
                         )
                         file_mashup_name += (
@@ -672,7 +672,7 @@ def merge_images_clothed():
     base_width = 0
     for char_folder in char_dir_clothed.iterdir():
         max_width_base = len(list(char_folder.glob("*")))
-        base_width = max(base_width, max_width_base)
+        base_width = max(base_width, max_width_base)-1 # -1 cause of the padding empty-name file
     base_width *= 1200
 
     merged_image = Image.new("RGB", (base_width, base_height))
@@ -680,12 +680,15 @@ def merge_images_clothed():
     y = 0  # width
     for char_folder in char_dir_clothed.iterdir():
         for image_file in char_folder.iterdir():
-            merging_hold = Image.open(image_file)
-            merged_image.paste(merging_hold, (y, x))
-            y += 1200
+            if image_file.suffix == ".png":
+                merging_hold = Image.open(image_file)
+                merged_image.paste(merging_hold, (y, x))
+                y += 1200
         x += 1600
         y = 0
-
+    logging.info(merged_image.width)
+    logging.info(merged_image.height)
+    merged_image.show()
     filename = output_dir / f"{time.time()}_clothed.png"
     merged_image.save(filename)
     print(f"File name {filename} saved!.")
