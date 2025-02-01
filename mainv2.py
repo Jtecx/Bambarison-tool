@@ -637,7 +637,8 @@ def merge_images(images, filename, nude=0):
         # timeE = time.time()
         # logging.info(f"Total time for pillow: {str(timeE - timeS)}")
 
-        filename_path_lossless_ocv = Path(str(filename_path) + "_ocv").with_suffix(".webp")
+        # filename_path_lossless_ocv = Path(str(filename_path) + "_ocv").with_suffix(".webp")
+        filename_path_lossless_ocv = filename_path.with_suffix(".webp")
         # timeS = time.time()
         cv2.imwrite(filename_path_lossless_ocv, merged_image_cv, [cv2.IMWRITE_WEBP_QUALITY, 100])
         # timeE = time.time()
@@ -654,7 +655,8 @@ def merge_images(images, filename, nude=0):
         # timeE = time.time()
         # logging.info(f"Total time for pillow: {str(timeE - timeS)}")
 
-        filename_path_lossy_ocv = Path(str(filename_path) + "_ocv95").with_suffix(".webp")
+        # filename_path_lossy_ocv = Path(str(filename_path) + "_ocv95").with_suffix(".webp")
+        filename_path_lossy_ocv = filename_path.with_suffix(".webp")
         # timeS = time.time()
         cv2.imwrite(filename_path_lossy_ocv, merged_image_cv, [cv2.IMWRITE_WEBP_QUALITY, 95]) # 95 is like 10 seconds faster than 75???
         # timeE = time.time()
@@ -776,4 +778,4 @@ if __name__ == "__main__":
 # TODO:
 #
 # Pixel background strip colour?
-# Str input validation function move to CoreSharedLibs
+# Proper name-file sanitation, for "home"/"away" cramball-esque stuff. i.e. multi sheet chars.
