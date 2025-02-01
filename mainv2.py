@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import time
 from PIL import Image
+import cv2
 import numpy as np
 import os
 import sys
@@ -623,21 +624,41 @@ def merge_images(images, filename, nude=0):
     maxsize = (16000, 16000)
     merged_image.thumbnail(maxsize, Image.Resampling.LANCZOS)
 
-    if file_quality == 0:
-        # filename_path = filename_path.with_suffix(".png")
-        # merged_image.save(filename_path, optimize=True)
+    merged_image_cv = np.array(merged_image)
+    merged_image_cv = cv2.cvtColor(merged_image_cv, cv2.COLOR_RGB2BGR)
 
-        filename_path_lossless = filename_path.with_suffix(".webp")
-        merged_image.save(filename_path_lossless, lossless=True, quality=100, method=6)
-        print(f"File name {filename_path_lossless} saved!.")
+
+    if file_quality == 0:
+        # logging.info(f"Hit Lossless @ {time.time()}")
+
+        # filename_path_lossless_pil = Path(str(filename_path) + "_pil").with_suffix(".webp")
+        # timeS = time.time()
+        # merged_image.save(filename_path_lossless_pil, lossless=True, quality=100, method=6)
+        # timeE = time.time()
+        # logging.info(f"Total time for pillow: {str(timeE - timeS)}")
+
+        filename_path_lossless_ocv = Path(str(filename_path) + "_ocv").with_suffix(".webp")
+        # timeS = time.time()
+        cv2.imwrite(filename_path_lossless_ocv, merged_image_cv, [cv2.IMWRITE_WEBP_QUALITY, 100])
+        # timeE = time.time()
+        # logging.info(f"Total time for OpenCV: {str(timeE - timeS)}")
+
+        print(f"File name {filename_path_lossless_ocv} saved!.")
 
     elif file_quality == 1:
-        # filename_path = filename_path.with_suffix(".jpg")
-        # merged_image.save(filename_path, optimize=True, keep_rgb=True)
+        # logging.info(f"Hit Lossy @ {time.time()}")
 
-        filename_path_lossy = filename_path.with_suffix(".webp")
-        merged_image.save(filename_path_lossy, quality=100, method=6)
-        print(f"File name {filename_path_lossy} saved!.")
+        # filename_path_lossy_pil = Path(str(filename_path) + "_pil").with_suffix(".webp")
+        # timeS = time.time()
+        # merged_image.save(filename_path_lossy_pil, quality=100, method=6)
+        # timeE = time.time()
+        # logging.info(f"Total time for pillow: {str(timeE - timeS)}")
+
+        filename_path_lossy_ocv = Path(str(filename_path) + "_ocv95").with_suffix(".webp")
+        # timeS = time.time()
+        cv2.imwrite(filename_path_lossy_ocv, merged_image_cv, [cv2.IMWRITE_WEBP_QUALITY, 95]) # 95 is like 10 seconds faster than 75???
+        # timeE = time.time()
+        # logging.info(f"Total time for OpenCV95: {str(timeE - timeS)}")
 
     # else:
         # starttime = time.time()

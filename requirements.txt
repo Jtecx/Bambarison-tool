@@ -1,3 +1,5 @@
 pillow>=10.2.0
 numpy>=1.26.4
 BTCoreSharedLibs
+
+opencv-python>=4.11.0.86
